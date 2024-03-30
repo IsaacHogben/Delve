@@ -3,11 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
-#include "Chunk.h"
-#include "ChunkRenderDistance.h"
+#include "ChunkInclude.h"
+#include "../Utils/ChunkMeshData.h"
 
 #include "ChunkManager.generated.h"
+
 
 UCLASS()
 class AChunkManager : public AActor
@@ -18,6 +18,9 @@ public:
 	// Sets default values for this actor's properties
 	AChunkManager();
 	int ChunkSize = 32;
+	int WorldScale = 50;
+
+	void CreateMeshSection(FChunkMeshData MeshData, FVector Transform, int Vertexes);
 
 protected:
 	// Called when the game starts or when spawned
