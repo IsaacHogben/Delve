@@ -40,3 +40,10 @@ FIntVector UVoxelFunctionLibrary::WorldToChunkPosition(const FVector& Position, 
 	
 	return Result;
 }
+
+bool UVoxelFunctionLibrary::IntVectorCompare(const FIntVector& Position1, const FIntVector& Position2)
+{
+	if (Position1.X == Position2.X && Position1.Y == Position2.Y && Position1.Z == Position2.Z)
+		return 1;
+	return 0;
+}

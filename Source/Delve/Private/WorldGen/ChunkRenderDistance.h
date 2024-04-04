@@ -11,10 +11,24 @@
 class ChunkRenderDistance
 {
 public:
-	ChunkRenderDistance();
-	void CalculateRenderSphere();
+	struct ChunkSpawnData
+	{
+		int Lod;
+		FIntVector Position;
+	};
+
+	ChunkRenderDistance(int RenderDistance);
 	~ChunkRenderDistance();
+
+	TArray<ChunkSpawnData> CalculateRenderSphere();
+	int CalculateLod(float Distance);
+
+	
+
+	//TArray<int8> LodDistanceArray;
 private:
-	int DrawDistance = 5;
-	TArray<TArray<FIntVector>> RenderHemisphere;
+	int MaxRenderDistance;
+	TArray<int8> LodArray = { 1, 2, 4, 8, 16, 32 };
+	//int DrawDistance = 5;
+	//TArray<TArray<FIntVector>> RenderHemisphere;
 };

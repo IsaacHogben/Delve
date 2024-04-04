@@ -7,64 +7,65 @@
 
 ChunkClass::ChunkClass()
 {
-	//PrimaryActorTick.bCanEverTick = true;
-
-	//Mesh = CreateDefaultSubobject<UProceduralMeshComponent>("Mesh");
-	//Noise = new FastNoiseLite();
-	//// Mesh Settings
-	//Mesh->SetCastShadow(true);
-
-	//// Set Mesh as root why?
-	//SetRootComponent(Mesh);
-}
-
-ChunkClass::~ChunkClass()
-{
+	
 }
 
 // Called when the game starts or when spawned
 void ChunkClass::BeginPlay()
 {
-	// Start measuring time
-	StartTime = std::chrono::high_resolution_clock::now();
+	StartAsyncChunkGen();
+}
 
-	//Mesh = CreateDefaultSubobject<UProceduralMeshComponent>("Mesh");
-	//Mesh->SetCastShadow(true);
+void ChunkClass::RenderDistanceUpdate(const FVector& Position, int RenderDistance)
+{	
+	//UE_LOG(LogTemp, Warning, TEXT("oh lordy"));
+	StartAsyncChunkUpdate(Position, RenderDistance);
+}
 
+void ChunkClass::Setup()
+{
 	Noise = new FastNoiseLite();
 	Noise->SetFrequency(Frequency);
 	Noise->SetNoiseType(FastNoiseLite::NoiseType_Perlin);
 	Noise->SetFractalType(FastNoiseLite::FractalType_FBm);
 
-	Setup();
-	//GenerateChunkAsync();
-	StartAsyncChunkGen();
-}
-
-void ChunkClass::Setup()
-{
 	ChunkPosition = ChunkPosition / WorldScale;
+	ChunkVector = FIntVector(
+		FMath::RoundToInt(ChunkPosition.X),
+		FMath::RoundToInt(ChunkPosition.Y),
+		FMath::RoundToInt(ChunkPosition.Z) / 32
+	);
 	Blocks.SetNum((ChunkSize + 2) * (ChunkSize + 2) * (ChunkSize + 2));
 	BlockSize = WorldScale * Lod;
-	//GenerateBlocksFromNoise(ChunkPosition);
 }
 
 void ChunkClass::StartAsyncChunkGen()
 {
-
 	FGraphEventRef FirstTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
 		GenerateChunkAsync();
-		}, TStatId(), nullptr, ENamedThreads::AnyHiPriThreadHiPriTask);
+		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
 
 	FGraphEventRef SecondTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
 		GenerateChunkAsyncComplete();
 		}, TStatId(), FirstTask, ENamedThreads::GameThread);
 
-	UE_LOG(LogTemp, Warning, TEXT("ParentBefore"));
 	FGraphEventArray TasksList;
 	TasksList.Add(FirstTask);
-	TasksList.Add(SecondTask);
-	UE_LOG(LogTemp, Warning, TEXT("ParentAfter"));
+}
+
+void ChunkClass::StartAsyncChunkUpdate(const FVector& Position, int RenderDistance)
+{
+	FGraphEventRef FirstTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, Position, RenderDistance]() {
+		UpdateChunkAsync(Position, RenderDistance);
+		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
+
+	FGraphEventRef SecondTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
+		UpdateChunkAsyncComplete();
+		}, TStatId(), FirstTask, ENamedThreads::GameThread);
+
+	FGraphEventArray TasksList;
+	TasksList.Add(FirstTask);
+
 }
 
 void ChunkClass::ModifyVoxelData(const FIntVector Position, const EBlock Block)
@@ -84,7 +85,7 @@ void ChunkClass::GenerateBlocksFromNoise(FVector Position)
 			{
 				const auto NoiseValue = Noise->GetNoise(x + Position.X, y + Position.Y, z + Position.Z);
 
-				if (NoiseValue >= 0)
+				if (NoiseValue >= 0 || z + Position.Z > -4)
 				{
 					Blocks[GetBlockIndex(x, y, z)] = EBlock::Air;
 				}
@@ -137,7 +138,10 @@ EBlock ChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
 
 void ChunkClass::GenerateChunkAsync()
 {
-	UE_LOG(LogTemp, Warning, TEXT("AsyncStart"));
+	//UE_LOG(LogTemp, Warning, TEXT("AsyncStartCount"));
+	//std::this_thread::sleep_for(std::chrono::seconds(6));
+	//UE_LOG(LogTemp, Warning, TEXT("AsyncEndCount"));
+	Setup();
 	GenerateBlocksFromNoise(ChunkPosition);
 	if (!IsChunkEmpty)
 		GenerateMesh();
@@ -145,10 +149,38 @@ void ChunkClass::GenerateChunkAsync()
 
 void ChunkClass::GenerateChunkAsyncComplete()
 {
-	UE_LOG(LogTemp, Warning, TEXT("AsyncComplete"));
 	if (!IsChunkEmpty)
-		ApplyMesh();
-	PostStats();
+		Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkPosition, VertexCount, Lod);
+}
+
+void ChunkClass::UpdateChunkAsync(const FVector& Position, int RenderDistance)
+{
+	ChunkRenderDistance crd(RenderDistance);
+	float distance = FMath::Sqrt(FVector::DistSquared(Position, FVector(ChunkVector) / ChunkSize));
+	//UE_LOG(LogTemp, Warning, TEXT("pos > %f"), distance);
+	if (distance >= RenderDistance)
+	{
+		//UE_LOG(LogTemp, Warning, TEXT("Out"));
+		return;
+	}
+	//UE_LOG(LogTemp, Warning, TEXT("In"));
+	int newLod = crd.CalculateLod(distance);
+	if (Lod == newLod)
+		return;
+	Lod = newLod;
+	BlockSize = WorldScale * Lod;
+	ClearMeshData();
+	if (!IsChunkEmpty)
+		GenerateMesh();
+}
+
+void ChunkClass::UpdateChunkAsyncComplete()
+{
+	//UE_LOG(LogTemp, Warning, TEXT("UpdateS>"));
+	//std::chrono::high_resolution_clock::time_point StartTime = std::chrono::high_resolution_clock::now();
+	if (!IsChunkEmpty)
+		ChunkManager->UpdateMeshSection(Mesh, MeshData, ChunkPosition, Lod);
+	//PostStats(StartTime);
 }
 
 void ChunkClass::GenerateMesh()
@@ -349,12 +381,12 @@ bool ChunkClass::CompareMask(const FMask M1, const FMask M2) const
 	return M1.Block == M2.Block && M1.Normal == M2.Normal;
 }
 
-void ChunkClass::ApplyMesh() const
+void ChunkClass::ApplyMesh()
 {
-	ChunkManager->CreateMeshSection(MeshData, ChunkPosition, VertexCount);
+	//Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkPosition, VertexCount, Lod);
 }
 
-void ChunkClass::ClearMesh()
+void ChunkClass::ClearMeshData()
 {
 	VertexCount = 0;
 	MeshData.Clear();
@@ -374,7 +406,7 @@ int ChunkClass::GetTextureIndex(EBlock Block, FVector Normal) const
 	}
 }
 
-void ChunkClass::PostStats()
+void ChunkClass::PostStats(std::chrono::high_resolution_clock::time_point StartTime)
 {
 	auto EndTime = std::chrono::high_resolution_clock::now();
 	auto Duration = std::chrono::duration_cast<std::chrono::microseconds>(EndTime - StartTime);
@@ -390,7 +422,7 @@ void ChunkClass::ModifyVoxel(const FIntVector Position, const EBlock Block)
 
 	ModifyVoxelData(Position, Block);
 
-	ClearMesh();
+	ClearMeshData();
 
 	GenerateMesh();
 

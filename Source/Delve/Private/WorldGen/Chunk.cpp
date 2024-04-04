@@ -31,21 +31,9 @@ void AChunk::BeginPlay()
 
 	Setup();
 
-	// Define your non-thread-safe function
-	auto NonThreadSafeFunction = [this]()
-		{
-			// Call your non-thread-safe function here
-			GenerateChunkAsyncComplete();
-		};
-
 	// Start async chunk generation and provide the non-thread-safe function as the completion callback
 	StartAsyncChunkGen();
 
-	//GenerateBlocksFromNoise(ChunkPosition);
-	//GenerateMesh();
-	//ApplyMesh();
-
-	//PostStats(StartTime);
 }
 
 void AChunk::Setup()
@@ -56,9 +44,9 @@ void AChunk::Setup()
 	//GenerateBlocksFromNoise(ChunkPosition);
 }
 
+//
 void AChunk::StartAsyncChunkGen()
 {
-
 	FGraphEventRef FirstTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
 		GenerateChunkAsync();
 		}, TStatId(), nullptr, ENamedThreads::AnyHiPriThreadHiPriTask);

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "ChunkManager.h"
+#include "ChunkRenderDistance.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/DateTime.h"
@@ -29,20 +30,24 @@ public:
 	};
 	
 	void BeginPlay();
-
+	void RenderDistanceUpdate(const FVector& Position, int RenderDistance);
 	AChunkManager* ChunkManager;
+	UProceduralMeshComponent* Mesh;
 	//Variables
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int ChunkSize = 32;
 	int BlockSize = 50;
 	int WorldScale = 50;
+	//Represents the chunks position in the block array as multiples of 32
 	FVector ChunkPosition;
+	//Represents the chunks position vector as whole number;
+	FIntVector ChunkVector;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int Lod = 1;
 	TObjectPtr<UMaterialInterface> Material;
 	UPROPERTY(EditAnywhere, Category = "Chunk")
-	float Frequency = 0.014;
+	float Frequency = 0.007;
 
 	UFUNCTION(BlueprintCallable, Category = "Chunk")
 	void ModifyVoxel(const FIntVector Position, const EBlock Block);
@@ -54,6 +59,7 @@ protected:
 	void Setup();
 
 	void StartAsyncChunkGen();
+	void StartAsyncChunkUpdate(const FVector& Position, int RenderDistance);
 
 	void ModifyVoxelData(const FIntVector Position, const EBlock Block);
 	void GenerateBlocksFromNoise(FVector Position);
@@ -63,6 +69,7 @@ protected:
 	int VertexCount = 0;
 
 private:
+	
 	TArray<EBlock> Blocks;
 	bool IsChunkEmpty = true;
 	//bool ThreadSafe = false;
@@ -73,14 +80,16 @@ private:
 	//FGraphEventRef FirstTask;
 	void GenerateChunkAsync();
 	void GenerateChunkAsyncComplete();
+
+	void UpdateChunkAsync(const FVector& Position, int RenderDistance);
+	void UpdateChunkAsyncComplete();
+	
 	void GenerateMesh();
 	void CreateQuad(FMask Mask, FIntVector AxisMask, int Width, int Height, FIntVector V1, FIntVector V2, FIntVector V3, FIntVector V4);
 	bool CompareMask(const FMask M1, const FMask M2) const;
-	void ApplyMesh() const;
-	void ClearMesh();
+	void ApplyMesh();
+	void ClearMeshData();
 
 	int GetTextureIndex(EBlock Block, FVector Normal) const;
-
-	std::chrono::high_resolution_clock::time_point StartTime;
-	void PostStats();
+	void PostStats(std::chrono::high_resolution_clock::time_point StartTime);
 };

@@ -22,4 +22,7 @@ class UVoxelFunctionLibrary final : public UBlueprintFunctionLibrary
 
 	UFUNCTION(BlueprintPure, Category="Voxel")
 	static FIntVector WorldToChunkPosition(const FVector& Position, const int Size);
+
+	UFUNCTION(BlueprintPure, Category = "IntVector")
+	static bool IntVectorCompare(const FIntVector& Position1, const FIntVector& Position2);
 };
