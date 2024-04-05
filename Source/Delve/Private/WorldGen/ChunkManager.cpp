@@ -82,6 +82,8 @@ UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData MeshDa
 
 void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector Transform, int Lod)
 {
+	//UE_LOG(LogTemp, Warning, TEXT("updatedmesh"));
+	//BenchmarkTimer timer;
 	Mesh->ClearAllMeshSections();
 	// Calculate Transform
 	//UE_LOG(LogTemp, Warning, TEXT("pos > %f,%f,%f"), Transform.X, Transform.Y, Transform.Z);
@@ -107,7 +109,7 @@ void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMesh
 		TArray<FProcMeshTangent>(),
 		true
 	);
-
+	//timer.LogTime();
 }
 
 // Called every frame

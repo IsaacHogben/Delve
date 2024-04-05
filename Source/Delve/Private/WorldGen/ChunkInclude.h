@@ -11,6 +11,7 @@
 #include "../Utils/Enums.h"
 #include "../Utils/FastNoiseLite.h"
 #include "../Utils/ChunkMeshData.h"
+#include "../Utils/BenchmarkTimer.h"
 
 
 /**

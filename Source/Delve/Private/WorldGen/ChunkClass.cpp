@@ -59,9 +59,9 @@ void ChunkClass::StartAsyncChunkUpdate(const FVector& Position, int RenderDistan
 		UpdateChunkAsync(Position, RenderDistance);
 		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
 
-	FGraphEventRef SecondTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
+	/*FGraphEventRef SecondTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
 		UpdateChunkAsyncComplete();
-		}, TStatId(), FirstTask, ENamedThreads::GameThread);
+		}, TStatId(), FirstTask, ENamedThreads::GameThread);*/
 
 	FGraphEventArray TasksList;
 	TasksList.Add(FirstTask);
@@ -170,17 +170,22 @@ void ChunkClass::UpdateChunkAsync(const FVector& Position, int RenderDistance)
 	Lod = newLod;
 	BlockSize = WorldScale * Lod;
 	ClearMeshData();
-	if (!IsChunkEmpty)
-		GenerateMesh();
+	if (IsChunkEmpty)
+		return;	
+	GenerateMesh();
+
+	FGraphEventRef SecondTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
+		UpdateChunkAsyncComplete();
+		}, TStatId(), nullptr, ENamedThreads::GameThread);
+
+	FGraphEventArray TasksList;
+	TasksList.Add(SecondTask);
 }
 
 void ChunkClass::UpdateChunkAsyncComplete()
 {
 	//UE_LOG(LogTemp, Warning, TEXT("UpdateS>"));
-	//std::chrono::high_resolution_clock::time_point StartTime = std::chrono::high_resolution_clock::now();
-	if (!IsChunkEmpty)
-		ChunkManager->UpdateMeshSection(Mesh, MeshData, ChunkPosition, Lod);
-	//PostStats(StartTime);
+	ChunkManager->UpdateMeshSection(Mesh, MeshData, ChunkPosition, Lod);
 }
 
 void ChunkClass::GenerateMesh()

@@ -29,7 +29,7 @@ public:
 
 	int ChunkSize = 32;
 	int WorldScale = 50;
-	int RenderDistance = 16;
+	int RenderDistance = 24;
 	UProceduralMeshComponent* CreateMeshSection(FChunkMeshData MeshData, FVector Transform, int Vertexes, int Lod);
 
 	void UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector Transform, int Lod);
@@ -39,7 +39,6 @@ protected:
 	virtual void BeginPlay() override;
 	void GenerateChunks();
 	void SpawnChunk(FIntVector position, int Lod);
-	int timer = 0;
 
 private:	
 	// Called every frame
