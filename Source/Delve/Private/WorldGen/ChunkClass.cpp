@@ -55,6 +55,7 @@ void ChunkClass::StartAsyncChunkGen()
 
 void ChunkClass::StartAsyncChunkUpdate(const FVector& Position, int RenderDistance)
 {
+
 	FGraphEventRef FirstTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, Position, RenderDistance]() {
 		UpdateChunkAsync(Position, RenderDistance);
 		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
@@ -115,8 +116,8 @@ EBlock ChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
 	{
 		if (!checkOutsideChunks)
 		{
-			if (Lod >= 8)//shows all faces for low lod
-				return EBlock::Air;
+			//if (Lod >= 8)//shows all faces for low lod
+				//return EBlock::Air;
 			if (Index.X >= ChunkSize + 2)//returns chunk padding for less inter-chunk referencing
 				Index.X = ChunkSize + 1;
 			else if (Index.X < 0)
@@ -139,7 +140,7 @@ EBlock ChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
 void ChunkClass::GenerateChunkAsync()
 {
 	//UE_LOG(LogTemp, Warning, TEXT("AsyncStartCount"));
-	//std::this_thread::sleep_for(std::chrono::seconds(6));
+	//std::this_thread::sleep_for(std::chrono::seconds(5));
 	//UE_LOG(LogTemp, Warning, TEXT("AsyncEndCount"));
 	Setup();
 	GenerateBlocksFromNoise(ChunkPosition);
@@ -155,9 +156,10 @@ void ChunkClass::GenerateChunkAsyncComplete()
 
 void ChunkClass::UpdateChunkAsync(const FVector& Position, int RenderDistance)
 {
+	//God Code do not Touch
+	std::this_thread::sleep_for(std::chrono::nanoseconds(1));
 	ChunkRenderDistance crd(RenderDistance);
 	float distance = FMath::Sqrt(FVector::DistSquared(Position, FVector(ChunkVector) / ChunkSize));
-	//UE_LOG(LogTemp, Warning, TEXT("pos > %f"), distance);
 	if (distance >= RenderDistance)
 	{
 		//UE_LOG(LogTemp, Warning, TEXT("Out"));
@@ -171,7 +173,8 @@ void ChunkClass::UpdateChunkAsync(const FVector& Position, int RenderDistance)
 	BlockSize = WorldScale * Lod;
 	ClearMeshData();
 	if (IsChunkEmpty)
-		return;	
+		return;
+	//UE_LOG(LogTemp, Warning, TEXT("Async"));
 	GenerateMesh();
 
 	FGraphEventRef SecondTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {

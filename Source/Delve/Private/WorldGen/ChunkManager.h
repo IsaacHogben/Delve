@@ -27,9 +27,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Chunk Manager")
 	void UpdatePlayerChunkPosition(const FVector& Position);
 
-	int ChunkSize = 32;
+	int ChunkSize = 64;
 	int WorldScale = 50;
-	int RenderDistance = 24;
+	int RenderDistance = 18;
 	UProceduralMeshComponent* CreateMeshSection(FChunkMeshData MeshData, FVector Transform, int Vertexes, int Lod);
 
 	void UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector Transform, int Lod);

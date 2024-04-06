@@ -17,12 +17,15 @@ AChunkManager::AChunkManager()
 
 void AChunkManager::UpdatePlayerChunkPosition(const FVector& Position)
 {
+	//BenchmarkTimer t;
 	int i = 0;
 	for (ChunkClass* instance : ChunkInstances) {
 		instance->RenderDistanceUpdate(Position, RenderDistance);
 		i++;
 	}
 	UE_LOG(LogTemp, Warning, TEXT("%d, chunks updated."), i);
+	//t.LogTime();
+
 }
 
 // Called when the game starts or when spawned
@@ -109,6 +112,7 @@ void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMesh
 		TArray<FProcMeshTangent>(),
 		true
 	);
+	//UE_LOG(LogTemp, Warning, TEXT("updatedmesh"));
 	//timer.LogTime();
 }
 

@@ -35,7 +35,7 @@ public:
 	UProceduralMeshComponent* Mesh;
 	//Variables
 	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int ChunkSize = 32;
+	int ChunkSize = 64;
 	int BlockSize = 50;
 	int WorldScale = 50;
 	//Represents the chunks position in the block array as multiples of 32
