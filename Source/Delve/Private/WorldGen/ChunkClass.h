@@ -3,25 +3,30 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ChunkManager.h"
+#include "ChunkInclude.h"
 #include "ChunkRenderDistance.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
+
 #include "Misc/DateTime.h"
 #include "../Utils/Enums.h"
 #include "../Utils/FastNoiseLite.h"
 #include "../Utils/ChunkMeshData.h"
-
 #include <chrono>
+
+#include "ChunkClass.generated.h"
 
 class UProceduralMeshComponent;
 class AChunkManager; // Forward declaration of AChunkManager
 
-class ChunkClass
+UCLASS()
+class UChunkClass : public UObject
 {
+	GENERATED_BODY()
+
 public:
-	ChunkClass();
-	~ChunkClass();
+	UChunkClass();
+	~UChunkClass();
 
 	struct FMask
 	{
@@ -47,7 +52,7 @@ public:
 	int Lod = 1;
 	TObjectPtr<UMaterialInterface> Material;
 	UPROPERTY(EditAnywhere, Category = "Chunk")
-	float Frequency = 0.007;
+	float Frequency = 0.005;
 
 	UFUNCTION(BlueprintCallable, Category = "Chunk")
 	void ModifyVoxel(const FIntVector Position, const EBlock Block);
@@ -58,35 +63,38 @@ protected:
 
 	void Setup();
 
-	void StartAsyncChunkGen();
+	void StartAsyncChunkGen(const FVector& PlayerPosition);
 	void StartAsyncChunkUpdate(const FVector& Position, int RenderDistance);
 
 	void ModifyVoxelData(const FIntVector Position, const EBlock Block);
 	void GenerateBlocksFromNoise(FVector Position);
 
 	FastNoiseLite* Noise;
-	FChunkMeshData MeshData;
+
+	UPROPERTY()
 	int VertexCount = 0;
 
 private:
-	
-	TArray<EBlock> Blocks;
+	TArray<EBlock>* Blocks;
+	TArray<FIntVector>* PerspectiveMask;
+	FChunkMeshData* MeshData;
 	bool IsChunkEmpty = true;
-	//bool ThreadSafe = false;
+
 
 	int GetBlockIndex(int X, int Y, int Z) const;
 	EBlock GetBlock(FIntVector Index, bool checkOutsideChunk);
 
-	//FGraphEventRef FirstTask;
-	void GenerateChunkAsync();
+	void GenerateChunkAsync(const FVector& PlayerPosition);
 	void GenerateChunkAsyncComplete();
 
 	void UpdateChunkAsync(const FVector& Position, int RenderDistance);
 	void UpdateChunkAsyncComplete();
 	
-	void GenerateMesh();
+	void GenerateMesh(const FVector& PlayerPosition);
 	void CreateQuad(FMask Mask, FIntVector AxisMask, int Width, int Height, FIntVector V1, FIntVector V2, FIntVector V3, FIntVector V4);
 	bool CompareMask(const FMask M1, const FMask M2) const;
+	TArray<FIntVector>* CalculatePerspectiveMask(FVector PlayerPosition);
+	bool CompareNormalMask(FIntVector Normal);
 	void ApplyMesh();
 	void ClearMeshData();
 

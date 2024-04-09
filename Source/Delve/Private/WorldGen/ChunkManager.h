@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "ChunkInclude.h"
-#include "ChunkClass.h"
 #include "../Utils/ChunkMeshData.h"
 
 #include <iostream>
@@ -12,7 +11,7 @@
 
 #include "ChunkManager.generated.h"
 
-class ChunkClass;
+class UChunkClass;
 
 UCLASS()
 class AChunkManager : public AActor
@@ -23,16 +22,18 @@ public:
 
 	// Sets default values for this actor's properties
 	AChunkManager();
+	~AChunkManager();
 
 	UFUNCTION(BlueprintCallable, Category = "Chunk Manager")
 	void UpdatePlayerChunkPosition(const FVector& Position);
 
 	int ChunkSize = 64;
 	int WorldScale = 50;
-	int RenderDistance = 18;
-	UProceduralMeshComponent* CreateMeshSection(FChunkMeshData MeshData, FVector Transform, int Vertexes, int Lod);
+	UPROPERTY(EditAnywhere, Category = "ChunkManager")
+	int RenderDistance = 1;
+	UProceduralMeshComponent* CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod);
 
-	void UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector Transform, int Lod);
+	void UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData* MeshData, FVector Transform, int Lod);
 
 protected:
 	// Called when the game starts or when spawned
@@ -43,5 +44,5 @@ protected:
 private:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
-	std::vector<ChunkClass*> ChunkInstances;
+	TArray<TObjectPtr<UChunkClass>> ChunkObjects;
 };

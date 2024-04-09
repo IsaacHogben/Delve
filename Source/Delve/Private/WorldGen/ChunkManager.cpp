@@ -10,22 +10,24 @@ AChunkManager::AChunkManager()
 	PrimaryActorTick.bCanEverTick = false;
 }
 
-//AChunkManager::~AChunkManager()
-//{
-//	ChunkInstances.erase(std::remove(ChunkInstances.begin(), ChunkInstances.end(), this), ChunkInstances.end());
-//}
+AChunkManager::~AChunkManager()
+{
+	/*for (UChunkClass* instance : ChunkInstances) {
+		delete instance;
+	}
+	ChunkInstances.clear();*/
+
+}
 
 void AChunkManager::UpdatePlayerChunkPosition(const FVector& Position)
 {
-	//BenchmarkTimer t;
+	UE_LOG(LogTemp, Warning, TEXT("Updating..."));
 	int i = 0;
-	for (ChunkClass* instance : ChunkInstances) {
+	for (UChunkClass* instance : ChunkObjects) {
 		instance->RenderDistanceUpdate(Position, RenderDistance);
 		i++;
 	}
-	UE_LOG(LogTemp, Warning, TEXT("%d, chunks updated."), i);
-	//t.LogTime();
-
+	UE_LOG(LogTemp, Warning, TEXT("%d Chunks Updated."), i);
 }
 
 // Called when the game starts or when spawned
@@ -46,16 +48,15 @@ void AChunkManager::GenerateChunks()
 
 void AChunkManager::SpawnChunk(FIntVector ChunkPos, int Lod)
 {
-	ChunkPos += FIntVector(0, 0, -1);//temp to not spawn camera in terrain
-	ChunkClass *chunk = new ChunkClass();//TODO can move this assignments to the constructor
+	UChunkClass* chunk = NewObject<UChunkClass>();//TODO can move this assignments to the constructor
 	chunk->ChunkManager = this;
 	chunk->Lod = Lod;
 	chunk->ChunkPosition = FVector(ChunkPos.X * ChunkSize * 50, ChunkPos.Y * ChunkSize * 50, ChunkPos.Z * ChunkSize * 50);
 	chunk->BeginPlay();
-	ChunkInstances.push_back(chunk);
+	ChunkObjects.Add(chunk);
 }
 
-UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData MeshData, FVector Transform, int Vertexes, int Lod)
+UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod)
 {
 	// Create a new procedural mesh component
 	UProceduralMeshComponent* Mesh = NewObject<UProceduralMeshComponent>(this);
@@ -69,7 +70,8 @@ UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData MeshDa
 		TObjectPtr<UMaterialInterface> Material;
 		Mesh->SetMaterial(0, Material);
 
-		UpdateMeshSection(Mesh, MeshData, Transform, Lod);
+		if (Vertexes)
+			UpdateMeshSection(Mesh, MeshData, Transform, Lod);
 
 		// Optionally, you can also register the component with the scene so it can be rendered and updated
 		Mesh->RegisterComponent();
@@ -83,7 +85,7 @@ UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData MeshDa
 	return Mesh;
 }
 
-void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector Transform, int Lod)
+void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData* MeshData, FVector Transform, int Lod)
 {
 	//UE_LOG(LogTemp, Warning, TEXT("updatedmesh"));
 	//BenchmarkTimer timer;
@@ -104,11 +106,11 @@ void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMesh
 	}
 	Mesh->CreateMeshSection(
 		0,
-		MeshData.Vertices,
-		MeshData.Triangles,
-		MeshData.Normals,
-		MeshData.UV0,
-		MeshData.Colors,
+		MeshData->Vertices,
+		MeshData->Triangles,
+		MeshData->Normals,
+		MeshData->UV0,
+		MeshData->Colors,
 		TArray<FProcMeshTangent>(),
 		true
 	);

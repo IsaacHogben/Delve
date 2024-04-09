@@ -4,6 +4,9 @@
 ChunkRenderDistance::ChunkRenderDistance(int RenderDistance)
 {
 	MaxRenderDistance = RenderDistance;
+	if (RenderDistance > LodArray.Num())
+		LodRenderDistance = RenderDistance;
+	else LodRenderDistance = LodArray.Num();
 }
 
 ChunkRenderDistance::~ChunkRenderDistance()
@@ -18,20 +21,19 @@ TArray<ChunkRenderDistance::ChunkSpawnData> ChunkRenderDistance::CalculateRender
 	FVector PlayerPosition = FVector(0, 0, 0);
 	TArray<ChunkSpawnData> dataArray;
 
-	for (int z = -MaxRenderDistance; z <= 0; z++)
+	for (int z = -MaxRenderDistance; z <= MaxRenderDistance; z++)
 	{
 		for (int x = -MaxRenderDistance; x <= MaxRenderDistance; x++)
 		{
 			for (int y = -MaxRenderDistance; y <= MaxRenderDistance; y++)
 			{
-				float distance = FMath::Sqrt(FVector::DistSquared(PlayerPosition, FVector(x, y, z)));
+				float distance = FVectorDistance(PlayerPosition, FVector(x, y, z));
 				if (distance < MaxRenderDistance)
 				{
 					ChunkSpawnData data;
 					data.Position = FIntVector(x, y, z);
 					data.Lod = CalculateLod(distance);
 					dataArray.Add(data);
-					//return dataArray;//temptest
 				}
 			}
 		}
@@ -42,9 +44,25 @@ TArray<ChunkRenderDistance::ChunkSpawnData> ChunkRenderDistance::CalculateRender
 //Calculates Lod for a chunk, based on a chunks vector distance from player
 int ChunkRenderDistance::CalculateLod(float Distance)
 {
-	int lod = static_cast<int>(Distance) / (MaxRenderDistance / 6);
-	if (lod >= 6)
-		lod = 5;
-	//UE_LOG(LogTemp, Warning, TEXT("%d | %f"), lod, Distance);
+	
+	int lod = static_cast<int>(Distance) / (LodRenderDistance / LodArray.Num());
+	if (lod >= LodArray.Num())
+		lod = LodArray.Num() - 1;
+	UE_LOG(LogTemp, Warning, TEXT("Lod Calculated at %d | %f"), lod, Distance);
 	return LodArray[lod];//Must return a vlaue from 0 to 5 as these are our available LODS
+}
+
+float ChunkRenderDistance::FVectorDistance(const FVector& Vector1, const FVector& Vector2)
+{
+	//UE_LOG(LogTemp, Warning, TEXT("Chunk pos, %f,%f,%f"), Vector2.X, Vector2.Y, Vector2.Z);
+	//UE_LOG(LogTemp, Warning, TEXT("Player pos %f,%f,%f"), Vector1.X, Vector1.Y, Vector1.Z);
+	// Calculate the components of the vector between the two points
+	float DeltaX = Vector1.X - Vector2.X;
+	float DeltaY = Vector1.Y - Vector2.Y;
+	float DeltaZ = Vector1.Z - Vector2.Z;
+
+	// Calculate the 3D distance between the two points using the Pythagorean theorem
+	float Distance = FMath::Sqrt(DeltaX * DeltaX + DeltaY * DeltaY + DeltaZ * DeltaZ);
+
+	return Distance;
 }

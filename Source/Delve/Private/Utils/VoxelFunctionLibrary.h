@@ -25,4 +25,7 @@ class UVoxelFunctionLibrary final : public UBlueprintFunctionLibrary
 
 	UFUNCTION(BlueprintPure, Category = "IntVector")
 	static bool IntVectorCompare(const FIntVector& Position1, const FIntVector& Position2);
+
+	UFUNCTION(BlueprintPure, Category = "Vector")
+	static FVector VectorRoundingAdjustment(const FVector& Vector);
 };

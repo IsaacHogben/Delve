@@ -8,11 +8,15 @@
 #include "Kismet/GameplayStatics.h"
 #include "Misc/DateTime.h"
 #include "ProceduralMeshComponent.h"
+#include "Templates/UniquePtr.h"
+
 #include "../Utils/Enums.h"
 #include "../Utils/FastNoiseLite.h"
 #include "../Utils/ChunkMeshData.h"
 #include "../Utils/BenchmarkTimer.h"
 
+#include "ChunkManager.h"
+#include "ChunkClass.h"
 
 /**
  * 

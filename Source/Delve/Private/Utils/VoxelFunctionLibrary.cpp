@@ -47,3 +47,16 @@ bool UVoxelFunctionLibrary::IntVectorCompare(const FIntVector& Position1, const 
 		return 1;
 	return 0;
 }
+
+FVector UVoxelFunctionLibrary::VectorRoundingAdjustment(const FVector& Vector)
+{
+	FVector Adjusted = FVector::Zero();
+	for (int i = 0; i < 3; i++)
+	{
+		if (Vector[i] < 0)
+			Adjusted[i] = Vector[i] - 1;
+		else
+			Adjusted[i] = Vector[i];
+	}
+	return Adjusted;
+}

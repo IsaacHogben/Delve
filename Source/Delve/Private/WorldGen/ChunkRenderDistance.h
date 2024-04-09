@@ -22,13 +22,12 @@ public:
 
 	TArray<ChunkSpawnData> CalculateRenderSphere();
 	int CalculateLod(float Distance);
+	static float FVectorDistance(const FVector& Vector1, const FVector& Vector2);
 
-	
-
-	//TArray<int8> LodDistanceArray;
 private:
 	int MaxRenderDistance;
-	TArray<int8> LodArray = { 1, 2, 4, 8, 16, 32 };
+	int LodRenderDistance;
+	TArray<int8> LodArray = {1, 1, 2, 2, 4, 4, 8, 16, 32, 64};
 	//int DrawDistance = 5;
 	//TArray<TArray<FIntVector>> RenderHemisphere;
 };
