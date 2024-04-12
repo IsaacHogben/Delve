@@ -87,11 +87,8 @@ UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData* MeshD
 
 void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData* MeshData, FVector Transform, int Lod)
 {
-	//UE_LOG(LogTemp, Warning, TEXT("updatedmesh"));
-	//BenchmarkTimer timer;
 	Mesh->ClearAllMeshSections();
 	// Calculate Transform
-	//UE_LOG(LogTemp, Warning, TEXT("pos > %f,%f,%f"), Transform.X, Transform.Y, Transform.Z);
 	auto MeshTransform = FTransform(
 		FRotator::ZeroRotator,
 		FVector(Transform.X * WorldScale, Transform.Y * WorldScale, Transform.Z * WorldScale),

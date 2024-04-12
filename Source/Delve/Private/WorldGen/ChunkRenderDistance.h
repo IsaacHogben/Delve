@@ -27,7 +27,7 @@ public:
 private:
 	int MaxRenderDistance;
 	int LodRenderDistance;
-	TArray<int8> LodArray = {1, 1, 2, 2, 4, 4, 8, 16, 32, 64};
+	TArray<int8> LodArray = {1, 1, 1, 1, 2, 2, 4, 8, 16, 32, 64};
 	//int DrawDistance = 5;
 	//TArray<TArray<FIntVector>> RenderHemisphere;
 };

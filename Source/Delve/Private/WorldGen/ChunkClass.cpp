@@ -7,8 +7,7 @@
 
 UChunkClass::UChunkClass()
 {
-	Blocks = new TArray<EBlock>;
-	Blocks->SetNum((ChunkSize + 2) * (ChunkSize + 2) * (ChunkSize + 2));
+	Blocks.SetNum((ChunkSize + 2) * (ChunkSize + 2) * (ChunkSize + 2));
 	MeshData = new FChunkMeshData();
 	//PerspectiveMask = new TArray<FIntVector>{ FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector::ZeroValue };
 }
@@ -78,7 +77,7 @@ void UChunkClass::ModifyVoxelData(const FIntVector Position, const EBlock Block)
 {
 	const int Index = GetBlockIndex(Position.X, Position.Y, Position.Z);
 
-	(*Blocks)[Index] = Block;
+	Blocks[Index] = Block;
 }
 
 void UChunkClass::GenerateBlocksFromNoise(FVector Position)
@@ -93,11 +92,11 @@ void UChunkClass::GenerateBlocksFromNoise(FVector Position)
 
 				if (NoiseValue >= 0)
 				{
-					(*Blocks)[GetBlockIndex(x, y, z)] = EBlock::Air;
+					Blocks[GetBlockIndex(x, y, z)] = EBlock::Air;
 				}
 				else
 				{
-					(*Blocks)[GetBlockIndex(x, y, z)] = EBlock::Stone;
+					Blocks[GetBlockIndex(x, y, z)] = EBlock::Stone;
 					IsChunkEmpty = false;
 				}
 			}
@@ -139,7 +138,7 @@ EBlock UChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
 		else
 			return EBlock::Air; //IE check for block in another chunk TODO
 	}
-	return (*Blocks)[GetBlockIndex(Index.X, Index.Y, Index.Z)];
+	return Blocks[GetBlockIndex(Index.X, Index.Y, Index.Z)];
 }
 
 void UChunkClass::GenerateChunkAsync(const FVector& PlayerPosition)
@@ -157,7 +156,7 @@ void UChunkClass::GenerateChunkAsyncComplete()
 
 void UChunkClass::UpdateChunkAsync(const FVector& PlayerPosition, int RenderDistance)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Update Chunk Async"));
+	//UE_LOG(LogTemp, Warning, TEXT("Update Chunk Async"));
 	if (IsChunkEmpty)
 		return;
 
@@ -174,13 +173,12 @@ void UChunkClass::UpdateChunkAsync(const FVector& PlayerPosition, int RenderDist
 	int newLod = crd.CalculateLod(distance);
 	if (Lod != newLod)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Update Lod"));
+		//UE_LOG(LogTemp, Warning, TEXT("Update Lod"));
 		Lod = newLod;
 		BlockSize = WorldScale * Lod;
 		ContinueToUpdate = true;
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("ZZZ"));
 	//God Code do not Touch
 	std::this_thread::sleep_for(std::chrono::nanoseconds(Lod - 1));
 
@@ -199,14 +197,10 @@ void UChunkClass::UpdateChunkAsync(const FVector& PlayerPosition, int RenderDist
 		}
 	}
 
-	/////test what is being garbage
-	//return;
-
 	if (!ContinueToUpdate)
 		return;
-	UE_LOG(LogTemp, Warning, TEXT("Clearing Mesh Data"));
+
 	ClearMeshData();
-	UE_LOG(LogTemp, Warning, TEXT("Attempting to access Blocks by Generating Mesh"));
 	GenerateMesh(PlayerPosition);
 
 	FGraphEventRef SecondTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
@@ -225,7 +219,7 @@ void UChunkClass::UpdateChunkAsyncComplete()
 
 void UChunkClass::GenerateMesh(const FVector& PlayerPosition)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Blocks array accessed. Num elements: %d"), (*Blocks)[99]);
+	//UE_LOG(LogTemp, Warning, TEXT("Blocks array accessed. Num elements: %d"), Blocks[99]);
 
 	// Sweep over each axis (X, Y, Z)
 	for (int Axis = 0; Axis < 3; ++Axis)
@@ -245,10 +239,8 @@ void UChunkClass::GenerateMesh(const FVector& PlayerPosition)
 		auto AxisMask = FIntVector::ZeroValue;
 
 		AxisMask[Axis] = 1;
-		UE_LOG(LogTemp, Warning, TEXT("before axis: %d"), Axis);
 		TArray<FMask> Mask;
 		Mask.SetNum(Axis1Limit * Axis2Limit);
-		UE_LOG(LogTemp, Warning, TEXT("after axis: %d"), Axis);
 
 		// Check each slice of the chunk
 		for (ChunkItr[Axis] = -1; ChunkItr[Axis] < MainAxisLimit;)
@@ -324,10 +316,10 @@ void UChunkClass::GenerateMesh(const FVector& PlayerPosition)
 
 						CreateQuad(
 							CurrentMask, AxisMask, Width, Height,
-							ChunkItr,
-							ChunkItr + DeltaAxis1,
-							ChunkItr + DeltaAxis2,
-							ChunkItr + DeltaAxis1 + DeltaAxis2
+							FVector(ChunkItr),
+							FVector(ChunkItr + DeltaAxis1),
+							FVector(ChunkItr + DeltaAxis2),
+							FVector(ChunkItr + DeltaAxis1 + DeltaAxis2)
 						);
 
 						DeltaAxis1 = FIntVector::ZeroValue;
@@ -360,20 +352,21 @@ void UChunkClass::CreateQuad(
 	const FIntVector AxisMask,
 	const int Width,
 	const int Height,
-	const FIntVector V1,
-	const FIntVector V2,
-	const FIntVector V3,
-	const FIntVector V4
+	const FVector V1,
+	const FVector V2,
+	const FVector V3,
+	const FVector V4
 )
 {
+
 	const auto Normal = FVector(AxisMask * Mask.Normal);
 	const auto Color = FColor(0, 0, 0, GetTextureIndex(Mask.Block, Normal));
 
 	MeshData->Vertices.Append({
-		FVector(V1) * BlockSize,
-		FVector(V2) * BlockSize,
-		FVector(V3) * BlockSize,
-		FVector(V4) * BlockSize
+		V1 * BlockSize,
+		V2 * BlockSize,
+		V3 * BlockSize,
+		V4 * BlockSize
 		});
 
 	MeshData->Triangles.Append({
@@ -439,7 +432,7 @@ bool UChunkClass::CompareMask(const FMask M1, const FMask M2) const
 
 TArray<FIntVector> UChunkClass::CalculatePerspectiveMask(FVector PlayerPosition)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Calculating perspective mask"));
+	//UE_LOG(LogTemp, Warning, TEXT("Calculating perspective mask"));
 	const FVector NormalPerspectiveMask = (ChunkPosition / ChunkSize) - PlayerPosition;
 	TArray<FIntVector> Mask;
 
@@ -452,7 +445,7 @@ TArray<FIntVector> UChunkClass::CalculatePerspectiveMask(FVector PlayerPosition)
 			IntVector[m] = -1;
 		Mask.Add(IntVector);
 	}
-	UE_LOG(LogTemp, Warning, TEXT("Done Calculating perspective mask"));
+	//UE_LOG(LogTemp, Warning, TEXT("Done Calculating perspective mask"));
 	return Mask;
 }
 

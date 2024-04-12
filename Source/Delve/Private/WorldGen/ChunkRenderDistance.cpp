@@ -48,7 +48,7 @@ int ChunkRenderDistance::CalculateLod(float Distance)
 	int lod = static_cast<int>(Distance) / (LodRenderDistance / LodArray.Num());
 	if (lod >= LodArray.Num())
 		lod = LodArray.Num() - 1;
-	UE_LOG(LogTemp, Warning, TEXT("Lod Calculated at %d | %f"), lod, Distance);
+	//UE_LOG(LogTemp, Warning, TEXT("Lod Calculated at %d | %f"), lod, Distance);
 	return LodArray[lod];//Must return a vlaue from 0 to 5 as these are our available LODS
 }
 

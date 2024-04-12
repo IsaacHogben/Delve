@@ -84,7 +84,7 @@ protected:
 	int VertexCount = 0;
 
 private:
-	TArray<EBlock>* Blocks;
+	TArray<EBlock> Blocks;
 	UPROPERTY()
 	TArray<FIntVector> PerspectiveMask;
 	FChunkMeshData* MeshData;
@@ -101,7 +101,7 @@ private:
 	void UpdateChunkAsyncComplete();
 	
 	void GenerateMesh(const FVector& PlayerPosition);
-	void CreateQuad(FMask Mask, FIntVector AxisMask, int Width, int Height, FIntVector V1, FIntVector V2, FIntVector V3, FIntVector V4);
+	void CreateQuad(FMask Mask, FIntVector AxisMask, int Width, int Height, FVector V1, FVector V2, FVector V3, FVector V4);
 	bool CompareMask(const FMask M1, const FMask M2) const;
 	TArray<FIntVector> CalculatePerspectiveMask(FVector PlayerPosition);
 	bool CompareNormalMask(FIntVector Normal);
