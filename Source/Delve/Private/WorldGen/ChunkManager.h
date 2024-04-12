@@ -44,5 +44,6 @@ protected:
 private:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+	UPROPERTY()
 	TArray<TObjectPtr<UChunkClass>> ChunkObjects;
 };

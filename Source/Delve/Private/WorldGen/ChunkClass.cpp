@@ -10,13 +10,12 @@ UChunkClass::UChunkClass()
 	Blocks = new TArray<EBlock>;
 	Blocks->SetNum((ChunkSize + 2) * (ChunkSize + 2) * (ChunkSize + 2));
 	MeshData = new FChunkMeshData();
-	PerspectiveMask = new TArray<FIntVector>{ FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector::ZeroValue };
+	//PerspectiveMask = new TArray<FIntVector>{ FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector::ZeroValue };
 }
 
 UChunkClass::~UChunkClass()
 {
-	//delete Mesh;
-	//delete Noise;
+	UE_LOG(LogTemp, Error, TEXT("ChunkClass Deconstructor Called!"));
 }
 
 // Called when the game starts or when spawned
@@ -188,10 +187,10 @@ void UChunkClass::UpdateChunkAsync(const FVector& PlayerPosition, int RenderDist
 	//Skip the mesh Normal mask step for close Lods becuase you can see the shadows missing
 	if (Lod != 1)
 	{
-		TArray<FIntVector>* NewPMask = CalculatePerspectiveMask(PlayerPosition);
+		TArray<FIntVector> NewPMask = CalculatePerspectiveMask(PlayerPosition);
 		for (int i = 0; i < 3; i++)
 		{
-			if ((*NewPMask)[i] != (*PerspectiveMask)[i])
+			if (NewPMask[i] != PerspectiveMask[i])
 			{
 				PerspectiveMask = NewPMask;
 				ContinueToUpdate = true;
@@ -246,10 +245,10 @@ void UChunkClass::GenerateMesh(const FVector& PlayerPosition)
 		auto AxisMask = FIntVector::ZeroValue;
 
 		AxisMask[Axis] = 1;
-
+		UE_LOG(LogTemp, Warning, TEXT("before axis: %d"), Axis);
 		TArray<FMask> Mask;
 		Mask.SetNum(Axis1Limit * Axis2Limit);
-
+		UE_LOG(LogTemp, Warning, TEXT("after axis: %d"), Axis);
 
 		// Check each slice of the chunk
 		for (ChunkItr[Axis] = -1; ChunkItr[Axis] < MainAxisLimit;)
@@ -425,10 +424,10 @@ void UChunkClass::CreateQuad(
 //Compares the new face normal against the chunks normal mask
 bool UChunkClass::CompareNormalMask(FIntVector Normal)
 {
-	TArray<FIntVector>& MaskArray = *PerspectiveMask;
+	//TArray<FIntVector> MaskArray = PerspectiveMask;
 	if (Lod == 1)
 		return true;
-	if (Normal == MaskArray[0] || Normal == MaskArray[1] || Normal == MaskArray[2])
+	if (Normal == PerspectiveMask[0] || Normal == PerspectiveMask[1] || Normal == PerspectiveMask[2])
 		return false;
 	return true;
 }
@@ -438,11 +437,11 @@ bool UChunkClass::CompareMask(const FMask M1, const FMask M2) const
 	return M1.Block == M2.Block && M1.Normal == M2.Normal;
 }
 
-TArray<FIntVector>* UChunkClass::CalculatePerspectiveMask(FVector PlayerPosition)
+TArray<FIntVector> UChunkClass::CalculatePerspectiveMask(FVector PlayerPosition)
 {
 	UE_LOG(LogTemp, Warning, TEXT("Calculating perspective mask"));
 	const FVector NormalPerspectiveMask = (ChunkPosition / ChunkSize) - PlayerPosition;
-	TArray<FIntVector>* Mask = new TArray<FIntVector>();
+	TArray<FIntVector> Mask;
 
 	for (int m = 0; m < 3; m++)
 	{
@@ -451,8 +450,9 @@ TArray<FIntVector>* UChunkClass::CalculatePerspectiveMask(FVector PlayerPosition
 			IntVector[m] = 1;
 		else if (NormalPerspectiveMask[m] < -0.5)
 			IntVector[m] = -1;
-		Mask->Add(IntVector);
+		Mask.Add(IntVector);
 	}
+	UE_LOG(LogTemp, Warning, TEXT("Done Calculating perspective mask"));
 	return Mask;
 }
 

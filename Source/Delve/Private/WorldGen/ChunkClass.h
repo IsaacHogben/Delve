@@ -19,6 +19,18 @@
 class UProceduralMeshComponent;
 class AChunkManager; // Forward declaration of AChunkManager
 
+USTRUCT()
+struct FMask
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	EBlock Block;
+
+	UPROPERTY()
+	int Normal;
+};
+
 UCLASS()
 class UChunkClass : public UObject
 {
@@ -27,16 +39,12 @@ class UChunkClass : public UObject
 public:
 	UChunkClass();
 	~UChunkClass();
-
-	struct FMask
-	{
-		EBlock Block;
-		int Normal;
-	};
 	
 	void BeginPlay();
 	void RenderDistanceUpdate(const FVector& Position, int RenderDistance);
+	UPROPERTY()
 	AChunkManager* ChunkManager;
+	UPROPERTY()
 	UProceduralMeshComponent* Mesh;
 	//Variables
 	UPROPERTY(EditAnywhere, Category = "Chunk")
@@ -44,8 +52,10 @@ public:
 	int BlockSize = 50;
 	int WorldScale = 50;
 	//Represents the chunks position in the block array as multiples of 32
+	UPROPERTY()
 	FVector ChunkPosition;
 	//Represents the chunks position vector as whole number;
+	UPROPERTY()
 	FIntVector ChunkVector;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
@@ -68,7 +78,6 @@ protected:
 
 	void ModifyVoxelData(const FIntVector Position, const EBlock Block);
 	void GenerateBlocksFromNoise(FVector Position);
-
 	FastNoiseLite* Noise;
 
 	UPROPERTY()
@@ -76,7 +85,8 @@ protected:
 
 private:
 	TArray<EBlock>* Blocks;
-	TArray<FIntVector>* PerspectiveMask;
+	UPROPERTY()
+	TArray<FIntVector> PerspectiveMask;
 	FChunkMeshData* MeshData;
 	bool IsChunkEmpty = true;
 
@@ -93,7 +103,7 @@ private:
 	void GenerateMesh(const FVector& PlayerPosition);
 	void CreateQuad(FMask Mask, FIntVector AxisMask, int Width, int Height, FIntVector V1, FIntVector V2, FIntVector V3, FIntVector V4);
 	bool CompareMask(const FMask M1, const FMask M2) const;
-	TArray<FIntVector>* CalculatePerspectiveMask(FVector PlayerPosition);
+	TArray<FIntVector> CalculatePerspectiveMask(FVector PlayerPosition);
 	bool CompareNormalMask(FIntVector Normal);
 	void ApplyMesh();
 	void ClearMeshData();
