@@ -14,12 +14,12 @@ ChunkRenderDistance::~ChunkRenderDistance()
 }
 
 //Defines the initial play zone for the chunk manager
-TArray<ChunkRenderDistance::ChunkSpawnData> ChunkRenderDistance::CalculateRenderSphere()
+TArray<FChunkSpawnData> ChunkRenderDistance::CalculateRenderSphere()
 {
-	TArray<ChunkSpawnData> chunkSpawnData;
+	TArray<FChunkSpawnData> chunkSpawnData;
 
 	FVector PlayerPosition = FVector(0, 0, 0);
-	TArray<ChunkSpawnData> dataArray;
+	TArray<FChunkSpawnData> dataArray;
 
 	for (int z = -MaxRenderDistance; z <= MaxRenderDistance; z++)
 	{
@@ -28,9 +28,10 @@ TArray<ChunkRenderDistance::ChunkSpawnData> ChunkRenderDistance::CalculateRender
 			for (int y = -MaxRenderDistance; y <= MaxRenderDistance; y++)
 			{
 				float distance = FVectorDistance(PlayerPosition, FVector(x, y, z));
-				if (distance < MaxRenderDistance)
+				if (distance <= MaxRenderDistance)
 				{
-					ChunkSpawnData data;
+					UE_LOG(LogTemp, Warning, TEXT("new chunk"));
+					FChunkSpawnData data;
 					data.Position = FIntVector(x, y, z);
 					data.Lod = CalculateLod(distance);
 					dataArray.Add(data);
@@ -38,6 +39,7 @@ TArray<ChunkRenderDistance::ChunkSpawnData> ChunkRenderDistance::CalculateRender
 			}
 		}
 	}
+	dataArray.Sort();
 	return dataArray;
 }
 
@@ -49,7 +51,7 @@ int ChunkRenderDistance::CalculateLod(float Distance)
 	if (lod >= LodArray.Num())
 		lod = LodArray.Num() - 1;
 	//UE_LOG(LogTemp, Warning, TEXT("Lod Calculated at %d | %f"), lod, Distance);
-	return LodArray[lod];//Must return a vlaue from 0 to 5 as these are our available LODS
+	return LodArray[lod];
 }
 
 float ChunkRenderDistance::FVectorDistance(const FVector& Vector1, const FVector& Vector2)

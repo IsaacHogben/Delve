@@ -1,13 +1,15 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "WorldGen/ChunkManager.h"
-#include "WorldGen/ChunkRenderDistance.h"
+//#include "WorldGen/ChunkRenderDistance.h"
 
 // Sets default values
 AChunkManager::AChunkManager()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
+	PlayerChunkPosition = FIntVector();
+	LastUpdateDirection = FIntVector();
 }
 
 AChunkManager::~AChunkManager()
@@ -21,13 +23,19 @@ AChunkManager::~AChunkManager()
 
 void AChunkManager::UpdatePlayerChunkPosition(const FVector& Position)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Updating..."));
-	int i = 0;
-	for (UChunkClass* instance : ChunkObjects) {
-		instance->RenderDistanceUpdate(Position, RenderDistance);
-		i++;
+	//UE_LOG(LogTemp, Warning, TEXT("Updating..."));
+	FIntVector Direction = VectorFunctionUtils::FVectorToFIntVector(Position) - PlayerChunkPosition;
+	if (Direction != FIntVector(0, 0, 0))
+	{
+		//UE_LOG(LogTemp, Warning, TEXT("Getting direction"));
+		LastUpdateDirection = Direction;
+		for (const auto& instance : ChunkObjects) {
+			instance.Chunk->RenderDistanceUpdate(Position, RenderDistance, LastUpdateDirection);
+		}
 	}
-	UE_LOG(LogTemp, Warning, TEXT("%d Chunks Updated."), i);
+	
+	PlayerChunkPosition = VectorFunctionUtils::FVectorToFIntVector(Position);
+	//UE_LOG(LogTemp, Warning, TEXT("%d Chunks Updated."), i);
 }
 
 // Called when the game starts or when spawned
@@ -35,25 +43,33 @@ void AChunkManager::BeginPlay()
 {
 	Super::BeginPlay();
 
-	GenerateChunks();
+	GenerateChunks(PlayerChunkPosition);
 }
 
-void AChunkManager::GenerateChunks()
+void AChunkManager::GenerateChunks(FIntVector CentralRenderChunkVector)
 {
+	UE_LOG(LogTemp, Warning, TEXT("ebebeb"));
 	ChunkRenderDistance crd(RenderDistance);
-	TArray<ChunkRenderDistance::ChunkSpawnData> dataArray = crd.CalculateRenderSphere();
-	for (ChunkRenderDistance::ChunkSpawnData& data : dataArray)
-		SpawnChunk(data.Position, data.Lod);
+	TArray<FChunkSpawnData> dataArray = crd.CalculateRenderSphere();
+	for (FChunkSpawnData& data : dataArray)
+		SpawnChunk(data, CentralRenderChunkVector);
 }
 
-void AChunkManager::SpawnChunk(FIntVector ChunkPos, int Lod)
+void AChunkManager::SpawnChunk(FChunkSpawnData data, FIntVector CentralRenderChunkVector)
 {
+	FIntVector position = (data.Position + CentralRenderChunkVector) * ChunkSize;
 	UChunkClass* chunk = NewObject<UChunkClass>();//TODO can move this assignments to the constructor
 	chunk->ChunkManager = this;
-	chunk->Lod = Lod;
-	chunk->ChunkPosition = FVector(ChunkPos.X * ChunkSize * 50, ChunkPos.Y * ChunkSize * 50, ChunkPos.Z * ChunkSize * 50);
+	chunk->Lod = data.Lod;
+	chunk->ChunkWorldPosition = FVector(position);
+	chunk->CentralRenderChunkVector = CentralRenderChunkVector;
 	chunk->BeginPlay();
-	ChunkObjects.Add(chunk);
+
+	FChunkSpawnData ChunkData = FChunkSpawnData();
+	ChunkData.Lod = data.Lod;
+	ChunkData.Position = data.Position;
+	ChunkData.Chunk = chunk;
+	ChunkObjects.Add(ChunkData);
 }
 
 UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod)
@@ -97,6 +113,11 @@ void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMesh
 	Mesh->SetRelativeTransform(MeshTransform);
 	//Set Properties based on the meshes Lod
 	if (Lod >= 2 && Lod != 0)
+	{
+		Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Mesh->SetCastShadow(false);
+	}
+	else //Properties for LOD 1 and 2
 	{
 		Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Mesh->SetCastShadow(false);

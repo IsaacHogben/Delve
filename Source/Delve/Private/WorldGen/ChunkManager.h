@@ -3,15 +3,18 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ChunkRenderDistance.h"
 #include "ChunkInclude.h"
 #include "../Utils/ChunkMeshData.h"
+//#include "../Utils/ChunkSpawnData.h"
+#include "../Utils/VectorFunctionUtils.h"
 
 #include <iostream>
-#include <vector>
 
 #include "ChunkManager.generated.h"
 
 class UChunkClass;
+struct FChunkSpawnData;
 
 UCLASS()
 class AChunkManager : public AActor
@@ -27,23 +30,29 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Chunk Manager")
 	void UpdatePlayerChunkPosition(const FVector& Position);
 
-	int ChunkSize = 64;
+	int ChunkSize = 32;
 	int WorldScale = 50;
 	UPROPERTY(EditAnywhere, Category = "ChunkManager")
 	int RenderDistance = 1;
 	UProceduralMeshComponent* CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod);
 
 	void UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData* MeshData, FVector Transform, int Lod);
+	
+	UPROPERTY()
+	FIntVector PlayerChunkPosition;
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-	void GenerateChunks();
-	void SpawnChunk(FIntVector position, int Lod);
+	void GenerateChunks(FIntVector CenterPoint);
+	void SpawnChunk(FChunkSpawnData dataArray, FIntVector CentralRenderChunkVector);
 
 private:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+	//FChunkSpawnData* 
 	UPROPERTY()
-	TArray<TObjectPtr<UChunkClass>> ChunkObjects;
+	TArray<FChunkSpawnData> ChunkObjects;
+	UPROPERTY()
+	FIntVector LastUpdateDirection;
 };

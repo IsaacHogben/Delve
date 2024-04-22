@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+
 #include "ChunkMeshData.generated.h"
 
 USTRUCT()
@@ -26,3 +27,4 @@ inline void FChunkMeshData::Clear()
 	Colors.Empty();
 	UV0.Empty();
 }
+

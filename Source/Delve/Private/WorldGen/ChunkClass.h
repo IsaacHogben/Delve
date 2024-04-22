@@ -12,6 +12,7 @@
 #include "../Utils/Enums.h"
 #include "../Utils/FastNoiseLite.h"
 #include "../Utils/ChunkMeshData.h"
+#include "../Utils/VectorFunctionUtils.h"
 #include <chrono>
 
 #include "ChunkClass.generated.h"
@@ -24,10 +25,10 @@ struct FMask
 {
 	GENERATED_BODY()
 
-	UPROPERTY()
+	//UPROPERTY()
 	EBlock Block;
 
-	UPROPERTY()
+	//UPROPERTY()
 	int Normal;
 };
 
@@ -41,40 +42,44 @@ public:
 	~UChunkClass();
 	
 	void BeginPlay();
-	void RenderDistanceUpdate(const FVector& Position, int RenderDistance);
+	void RenderDistanceUpdate(const FVector& Position, int RenderDistance, const FIntVector& Direction);
 	UPROPERTY()
 	AChunkManager* ChunkManager;
 	UPROPERTY()
 	UProceduralMeshComponent* Mesh;
 	//Variables
 	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int ChunkSize = 64;
+	int ChunkSize = 32;
 	int BlockSize = 50;
 	int WorldScale = 50;
-	//Represents the chunks position in the block array as multiples of 32
-	UPROPERTY()
-	FVector ChunkPosition;
-	//Represents the chunks position vector as whole number;
-	UPROPERTY()
-	FIntVector ChunkVector;
+	
+	UPROPERTY()// Represents the chunks position in the world
+	FVector ChunkWorldPosition;
+	
+	UPROPERTY()// Represents the chunks position vector as whole number;
+	FIntVector ChunkVectorPosition;
+
+	UPROPERTY()// Represents the center of the latest chunk render sphere. Used as reference around when moving chunks
+	FIntVector CentralRenderChunkVector;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int Lod = 1;
 	TObjectPtr<UMaterialInterface> Material;
 	UPROPERTY(EditAnywhere, Category = "Chunk")
-	float Frequency = 0.005;
+	float Frequency = 0.03;
 
 	UFUNCTION(BlueprintCallable, Category = "Chunk")
 	void ModifyVoxel(const FIntVector Position, const EBlock Block);
 
+	void UpdateChunkPosition(FIntVector ChunkVectorPosition);
+
 protected:
 	// Called when the game starts or when spawned
 	
-
 	void Setup();
 
 	void StartAsyncChunkGen(const FVector& PlayerPosition);
-	void StartAsyncChunkUpdate(const FVector& Position, int RenderDistance);
+	void StartAsyncChunkUpdate(const FVector& Position, int RenderDistance, const FIntVector& Direction);
 
 	void ModifyVoxelData(const FIntVector Position, const EBlock Block);
 	void GenerateBlocksFromNoise(FVector Position);
@@ -90,24 +95,27 @@ private:
 	FChunkMeshData* MeshData;
 	bool IsChunkEmpty = true;
 
-
-	int GetBlockIndex(int X, int Y, int Z) const;
-	EBlock GetBlock(FIntVector Index, bool checkOutsideChunk);
-
+	
+	//Async Tasks
+	FGraphEventRef PreviousTask = nullptr;
+	FGraphEventArray TasksList;
 	void GenerateChunkAsync(const FVector& PlayerPosition);
 	void GenerateChunkAsyncComplete();
+	void UpdateChunkAsync(const FVector& Position, int RenderDistance, const FIntVector& Direction);
+	void UpdateChunkAsyncComplete();	
 
-	void UpdateChunkAsync(const FVector& Position, int RenderDistance);
-	void UpdateChunkAsyncComplete();
-	
-	void GenerateMesh(const FVector& PlayerPosition);
+	//Mesh
+	void GenerateMesh();
 	void CreateQuad(FMask Mask, FIntVector AxisMask, int Width, int Height, FVector V1, FVector V2, FVector V3, FVector V4);
-	bool CompareMask(const FMask M1, const FMask M2) const;
-	TArray<FIntVector> CalculatePerspectiveMask(FVector PlayerPosition);
-	bool CompareNormalMask(FIntVector Normal);
 	void ApplyMesh();
 	void ClearMeshData();
 
+	//Utils
+	int GetBlockIndex(int X, int Y, int Z) const;
+	EBlock GetBlock(FIntVector Index, bool checkOutsideChunk);
+	bool CompareMask(const FMask M1, const FMask M2) const;
+	TArray<FIntVector> CalculatePerspectiveMask(FVector PlayerPosition);
+	bool CompareNormalMask(FIntVector Normal);
 	int GetTextureIndex(EBlock Block, FVector Normal) const;
 	void PostStats(std::chrono::high_resolution_clock::time_point StartTime);
 };

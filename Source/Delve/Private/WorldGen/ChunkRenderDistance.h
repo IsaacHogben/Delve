@@ -4,30 +4,26 @@
 
 #include "CoreMinimal.h"
 #include "Utils/Enums.h"
+#include "Utils/ChunkStructs.h"
 
-/**
- * 
- */
+struct FChunkSpawnData;
+
 class ChunkRenderDistance
 {
 public:
-	struct ChunkSpawnData
-	{
-		int Lod;
-		FIntVector Position;
-	};
 
 	ChunkRenderDistance(int RenderDistance);
 	~ChunkRenderDistance();
 
-	TArray<ChunkSpawnData> CalculateRenderSphere();
+	TArray<FChunkSpawnData> CalculateRenderSphere();
 	int CalculateLod(float Distance);
 	static float FVectorDistance(const FVector& Vector1, const FVector& Vector2);
 
 private:
 	int MaxRenderDistance;
 	int LodRenderDistance;
-	TArray<int8> LodArray = {1, 1, 1, 1, 2, 2, 4, 8, 16, 32, 64};
+	//TArray<int8> LodArray = {1, 1, 1, 1, 1, 1, 2, 2, 2, 4, 4, 8, 16, 32, 64, 64, 64, 64};
+	TArray<int8> LodArray = {1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 8, 8, 8, 16, 16, 32};
 	//int DrawDistance = 5;
 	//TArray<TArray<FIntVector>> RenderHemisphere;
 };

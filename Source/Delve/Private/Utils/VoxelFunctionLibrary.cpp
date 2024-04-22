@@ -60,3 +60,19 @@ FVector UVoxelFunctionLibrary::VectorRoundingAdjustment(const FVector& Vector)
 	}
 	return Adjusted;
 }
+
+FVector UVoxelFunctionLibrary::FVectorRoundToInt(const FVector& Vector)
+{
+	FVector Adjusted = FVector::Zero();
+	for (int i = 0; i < 3; i++)
+	{
+		Adjusted[i] = FMath::RoundToInt(Vector[i]);
+	}
+	return Adjusted;
+}
+
+FIntVector UVoxelFunctionLibrary::SubtractIntVector(const FIntVector& FIntVector1, const FIntVector& FIntVector2)
+{
+	return FIntVector1 - FIntVector2;
+}
+

@@ -14,9 +14,11 @@
 #include "../Utils/FastNoiseLite.h"
 #include "../Utils/ChunkMeshData.h"
 #include "../Utils/BenchmarkTimer.h"
+#include "../Utils/VectorFunctionUtils.h"
 
 #include "ChunkManager.h"
 #include "ChunkClass.h"
+
 
 /**
  * 

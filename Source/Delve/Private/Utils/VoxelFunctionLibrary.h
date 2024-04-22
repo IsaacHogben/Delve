@@ -28,4 +28,12 @@ class UVoxelFunctionLibrary final : public UBlueprintFunctionLibrary
 
 	UFUNCTION(BlueprintPure, Category = "Vector")
 	static FVector VectorRoundingAdjustment(const FVector& Vector);
+
+	UFUNCTION(BlueprintPure, Category = "Vector")
+	static FVector FVectorRoundToInt(const FVector& Vector);
+
+	UFUNCTION(BlueprintPure, Category = "IntVector")
+	static FIntVector SubtractIntVector(const FIntVector& FIntVector1, const FIntVector& FIntVector2);
 };
+
+
