@@ -21,11 +21,16 @@ void UChunkClass::BeginPlay()
 	StartAsyncChunkGen(FVector::Zero());
 }
 
-void UChunkClass::RenderDistanceUpdate(const FVector& Position, int RenderDistance, const FIntVector& Direction)
-{	
-	//UE_LOG(LogTemp, Warning, TEXT("oh lordy"));
-	StartAsyncChunkUpdate(Position, RenderDistance, Direction);
-}
+//void UChunkClass::ChunkPositionUpdate(const FVector PlayerPosition, const FIntVector NewChunkPosition)
+//{
+//	UE_LOG(LogTemp, Warning, TEXT("ChunkClass PosUp Called"));
+//}
+//
+//void UChunkClass::ChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition)
+//{	
+//	//UE_LOG(LogTemp, Warning, TEXT("oh lordy"));
+//	StartAsyncChunkLodUpdate(RenderDistance, Distance, PlayerPosition);
+//}
 
 void UChunkClass::Setup()
 {
@@ -37,7 +42,7 @@ void UChunkClass::Setup()
 	Noise->SetNoiseType(FastNoiseLite::NoiseType_Perlin);
 	Noise->SetFractalType(FastNoiseLite::FractalType_FBm);
 
-	ChunkWorldPosition = ChunkWorldPosition;
+	//ChunkWorldPosition = ChunkWorldPosition;
 	ChunkVectorPosition = FIntVector(
 		FMath::RoundToInt(ChunkWorldPosition.X),
 		FMath::RoundToInt(ChunkWorldPosition.Y),
@@ -61,22 +66,29 @@ void UChunkClass::StartAsyncChunkGen(const FVector& PlayerPosition)
 	TasksList.Add(FirstTask);
 }
 
-void UChunkClass::StartAsyncChunkUpdate(const FVector& Position, int RenderDistance, const FIntVector& Direction)
+void UChunkClass::StartAsyncChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition)
 {
-
-	FGraphEventRef NewUpdateTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, Position, RenderDistance, Direction]() {
-		UpdateChunkAsync(Position, RenderDistance, Direction);
+	FGraphEventRef NewUpdateTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, RenderDistance, Distance, PlayerPosition]() {
+		UpdateChunkLodAsync(RenderDistance, Distance, PlayerPosition);
 		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
 
-	//FGraphEventArray TasksList;
-
-	if (TasksList.Contains(PreviousTask))
+	// Override any outstanding task
+	if (TasksList.Contains(PreviousLodUpdateTask))
 	{
-		TasksList.Remove(PreviousTask);
+		TasksList.Remove(PreviousLodUpdateTask);
 	}
 
 	TasksList.Add(NewUpdateTask);
-	PreviousTask = NewUpdateTask;
+	PreviousLodUpdateTask = NewUpdateTask;
+}
+
+void UChunkClass::StartAsyncChunkPositionUpdate(const FVector PlayerPosition, const FIntVector NewChunkPosition)
+{
+	FGraphEventRef NewUpdateTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, PlayerPosition, NewChunkPosition]() {
+		UpdateChunkPositionAsync(PlayerPosition, NewChunkPosition);
+		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
+
+	TasksList.Add(NewUpdateTask);
 }
 
 void UChunkClass::ModifyVoxelData(const FIntVector Position, const EBlock Block)
@@ -171,19 +183,36 @@ void UChunkClass::GenerateChunkAsyncComplete()
 	Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
 }
 
-void UChunkClass::UpdateChunkAsync(const FVector& PlayerPosition, int RenderDistance, const FIntVector& Direction)
+void UChunkClass::UpdateChunkLodAsync(int RenderDistance, const float Distance, const FVector PlayerPosition)
 {
 	//God Code do not Touch
 	std::this_thread::sleep_for(std::chrono::nanoseconds(Lod - 1));
 
 	//Setup
 	bool ContinueToUpdate = false;
-	ChunkRenderDistance crd(RenderDistance);
-	FIntVector PlayerChunk = VectorFunctionUtils::FVectorToFIntVector(PlayerPosition);
-	float distance = crd.FVectorDistance(FVector(PlayerChunk), FVector(ChunkVectorPosition));
 
+	GetLod(RenderDistance, Distance, ContinueToUpdate);
+	UpdatePerspectiveMask(PlayerPosition, ContinueToUpdate);
+
+	if (!ContinueToUpdate)
+		return;
+	
+	ClearMeshData();
+	GenerateMesh();
+
+	FGraphEventRef CompletionCallback = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
+		UpdateChunkAsyncComplete();
+		}, TStatId(), nullptr, ENamedThreads::GameThread);
+
+	//FGraphEventArray TasksList;
+	TasksList.Add(CompletionCallback);
+}
+
+void UChunkClass::GetLod(int RenderDistance, const float& Distance, bool& ContinueToUpdate)
+{
+	ChunkRenderDistance crd(RenderDistance);
 	//Update Lod if it has changed
-	int newLod = crd.CalculateLod(distance);
+	int newLod = crd.CalculateLod(Distance);
 	if (Lod != newLod)
 	{
 		//UE_LOG(LogTemp, Warning, TEXT("Update Lod"));
@@ -191,54 +220,10 @@ void UChunkClass::UpdateChunkAsync(const FVector& PlayerPosition, int RenderDist
 		BlockSize = WorldScale * Lod;
 		ContinueToUpdate = true;
 	}
-	
-	//UE_LOG(LogTemp, Warning, TEXT("Direction, %d,%d,%d"), Direction.X, Direction.Y, Direction.Z);
-	if (false) //NOT WORKING
-	{	
-		//CentralRenderChunkVector = PlayerChunk;
-		//UE_LOG(LogTemp, Warning, TEXT("Step One"));
-		FIntVector NewChunkVector = ChunkVectorPosition;	
-		bool RepositionChunk = false;
-		UE_LOG(LogTemp, Warning, TEXT("Direction, %d,%d,%d"), Direction.X, Direction.Y, Direction.Z);
-		for (int i = 0; i < 3; i++)
-		{
-			if ((Direction[i] < 0 && PlayerChunk[i] < ChunkVectorPosition[i]) 
-				|| (Direction[i] > 0 && PlayerChunk[i] > ChunkVectorPosition[i])) //if direction alligns with chunk and center position
-			{
-				if (distance > RenderDistance)
-				{
+}
 
-					int d = 0;// Direction[i];
-					for (int j = ChunkVectorPosition[i]; j != PlayerChunk[i] - Direction[i]; j += Direction[i])
-					{
-						d += Direction[i];
-					}
-					NewChunkVector[i] = ChunkVectorPosition[i] + 2 * d + Direction[i];;
-					UE_LOG(LogTemp, Warning, TEXT("Chunk Was, %d,%d,%d"), ChunkVectorPosition.X, ChunkVectorPosition.Y, ChunkVectorPosition.Z);
-					distance = crd.FVectorDistance(FVector(PlayerChunk), FVector(NewChunkVector));
-					ContinueToUpdate = true;
-					RepositionChunk = true;
-				}
-				else
-				{
-					UE_LOG(LogTemp, Warning, TEXT("Caught bound chunk"));
-				}
-			}	
-		}
-		
-
-		if (RepositionChunk)
-		{
-
-			ChunkWorldPosition = FVector(NewChunkVector) * ChunkSize;
-			ChunkVectorPosition = NewChunkVector;
-			
-			GenerateBlocksFromNoise(ChunkWorldPosition);
-		}
-		
-	}
-	CentralRenderChunkVector = PlayerChunk;
-
+void UChunkClass::UpdatePerspectiveMask(const FVector& PlayerPosition, bool& ContinueToUpdate)
+{
 	//Skip the mesh Normal mask step for close Lods becuase you can see the shadows missing
 	if (Lod != 1)
 	{
@@ -249,32 +234,40 @@ void UChunkClass::UpdateChunkAsync(const FVector& PlayerPosition, int RenderDist
 			{
 				PerspectiveMask = NewPMask;
 				ContinueToUpdate = true;
-				break;
 			}
 		}
 	}
-	// Update Player position i.e Center of render distance
-	//PlayerChunkVector = VectorFunctionUtils::FVectorToFIntVector(PlayerPosition);
+}
 
-	if (!ContinueToUpdate)
-		return;
-	
+void UChunkClass::UpdateChunkPositionAsync(const FVector PlayerPosition, const FIntVector NewChunkPosition)
+{
+	bool ContinueToUpdate = true;
+
+	//Update Position
+	ChunkVectorPosition = NewChunkPosition;
+	ChunkWorldPosition = FVector(ChunkVectorPosition) * ChunkSize;
+
+	//Get Blocks for new position
+	GenerateBlocksFromNoise(ChunkWorldPosition);
+
+	UpdatePerspectiveMask(PlayerPosition, ContinueToUpdate);
+
 	ClearMeshData();
 	GenerateMesh();
 
-	FGraphEventRef SecondTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
+	FGraphEventRef CompletionCallback = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
 		UpdateChunkAsyncComplete();
 		}, TStatId(), nullptr, ENamedThreads::GameThread);
 
 	//FGraphEventArray TasksList;
-	TasksList.Add(SecondTask);
+	TasksList.Add(CompletionCallback);
 }
 
 void UChunkClass::UpdateChunkAsyncComplete()
 {
-	//UE_LOG(LogTemp, Warning, TEXT("UpdateS>"));
 	ChunkManager->UpdateMeshSection(Mesh, MeshData, ChunkWorldPosition, Lod);
 }
+
 
 void UChunkClass::GenerateMesh()
 {

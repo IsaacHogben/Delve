@@ -17,7 +17,7 @@ public:
 
 	TArray<FChunkSpawnData> CalculateRenderSphere();
 	int CalculateLod(float Distance);
-	static float FVectorDistance(const FVector& Vector1, const FVector& Vector2);
+
 
 private:
 	int MaxRenderDistance;
@@ -27,3 +27,6 @@ private:
 	//int DrawDistance = 5;
 	//TArray<TArray<FIntVector>> RenderHemisphere;
 };
+
+static float FVectorDistance(const FVector& Vector1, const FVector& Vector2);
+static float FIntVectorDistance(const FIntVector& Vector1, const FIntVector& Vector2);

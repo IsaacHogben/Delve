@@ -42,7 +42,7 @@ public:
 	~UChunkClass();
 	
 	void BeginPlay();
-	void RenderDistanceUpdate(const FVector& Position, int RenderDistance, const FIntVector& Direction);
+	
 	UPROPERTY()
 	AChunkManager* ChunkManager;
 	UPROPERTY()
@@ -53,7 +53,7 @@ public:
 	int BlockSize = 50;
 	int WorldScale = 50;
 	
-	UPROPERTY()// Represents the chunks position in the world
+	UPROPERTY()// Represents the chunks position in the world. Used for Noise sample pos.
 	FVector ChunkWorldPosition;
 	
 	UPROPERTY()// Represents the chunks position vector as whole number;
@@ -71,7 +71,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Chunk")
 	void ModifyVoxel(const FIntVector Position, const EBlock Block);
 
-	void UpdateChunkPosition(FIntVector ChunkVectorPosition);
+	//void ChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition); 
+	//void ChunkPositionUpdate(const FVector PlayerPosition, const FIntVector NewChunkPosition);
+	//void UpdateChunkPosition(FIntVector ChunkVectorPosition);
+	void StartAsyncChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition);
+	void StartAsyncChunkPositionUpdate(const FVector PlayerPosition, const FIntVector NewChunkPosition);
 
 protected:
 	// Called when the game starts or when spawned
@@ -79,7 +83,7 @@ protected:
 	void Setup();
 
 	void StartAsyncChunkGen(const FVector& PlayerPosition);
-	void StartAsyncChunkUpdate(const FVector& Position, int RenderDistance, const FIntVector& Direction);
+	
 
 	void ModifyVoxelData(const FIntVector Position, const EBlock Block);
 	void GenerateBlocksFromNoise(FVector Position);
@@ -97,12 +101,17 @@ private:
 
 	
 	//Async Tasks
-	FGraphEventRef PreviousTask = nullptr;
+	FGraphEventRef PreviousLodUpdateTask = nullptr;
 	FGraphEventArray TasksList;
 	void GenerateChunkAsync(const FVector& PlayerPosition);
 	void GenerateChunkAsyncComplete();
-	void UpdateChunkAsync(const FVector& Position, int RenderDistance, const FIntVector& Direction);
-	void UpdateChunkAsyncComplete();	
+
+	void UpdateChunkLodAsync(int RenderDistance, const float Distance, const FVector PlayerPosition);
+	void GetLod(int RenderDistance, const float& Distance, bool& ContinueToUpdate);
+	void UpdatePerspectiveMask(const FVector& PlayerPosition, bool& ContinueToUpdate);
+	void UpdateChunkAsyncComplete();
+
+	void UpdateChunkPositionAsync(const FVector PlayerPosition, const FIntVector NewChunkPosition);
 
 	//Mesh
 	void GenerateMesh();

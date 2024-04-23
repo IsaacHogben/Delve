@@ -30,7 +30,6 @@ TArray<FChunkSpawnData> ChunkRenderDistance::CalculateRenderSphere()
 				float distance = FVectorDistance(PlayerPosition, FVector(x, y, z));
 				if (distance <= MaxRenderDistance)
 				{
-					UE_LOG(LogTemp, Warning, TEXT("new chunk"));
 					FChunkSpawnData data;
 					data.Position = FIntVector(x, y, z);
 					data.Lod = CalculateLod(distance);
@@ -54,7 +53,7 @@ int ChunkRenderDistance::CalculateLod(float Distance)
 	return LodArray[lod];
 }
 
-float ChunkRenderDistance::FVectorDistance(const FVector& Vector1, const FVector& Vector2)
+static float FVectorDistance(const FVector& Vector1, const FVector& Vector2)
 {
 	//UE_LOG(LogTemp, Warning, TEXT("Chunk pos, %f,%f,%f"), Vector2.X, Vector2.Y, Vector2.Z);
 	//UE_LOG(LogTemp, Warning, TEXT("Player pos %f,%f,%f"), Vector1.X, Vector1.Y, Vector1.Z);
@@ -68,3 +67,5 @@ float ChunkRenderDistance::FVectorDistance(const FVector& Vector1, const FVector
 
 	return Distance;
 }
+
+

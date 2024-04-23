@@ -39,7 +39,7 @@ public:
 	void UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData* MeshData, FVector Transform, int Lod);
 	
 	UPROPERTY()
-	FIntVector PlayerChunkPosition;
+	FIntVector PreviousPlayerChunkPosition;
 
 protected:
 	// Called when the game starts or when spawned
