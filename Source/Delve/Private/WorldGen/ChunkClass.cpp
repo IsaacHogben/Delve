@@ -265,9 +265,8 @@ void UChunkClass::UpdateChunkPositionAsync(const FVector PlayerPosition, const F
 
 void UChunkClass::UpdateChunkAsyncComplete()
 {
-	ChunkManager->UpdateMeshSection(Mesh, MeshData, ChunkWorldPosition, Lod);
+	ChunkManager->UpdateMeshSection(Mesh, MeshData, ChunkWorldPosition, Lod, VertexCount);
 }
-
 
 void UChunkClass::GenerateMesh()
 {

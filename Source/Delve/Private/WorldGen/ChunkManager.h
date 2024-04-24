@@ -36,7 +36,7 @@ public:
 	int RenderDistance = 1;
 	UProceduralMeshComponent* CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod);
 
-	void UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData* MeshData, FVector Transform, int Lod);
+	void UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData* MeshData, FVector Transform, int Lod, int Vertices);
 	
 	UPROPERTY()
 	FIntVector PreviousPlayerChunkPosition;
@@ -50,9 +50,14 @@ protected:
 private:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
-	//FChunkSpawnData* 
+
+	void UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition);
+
 	UPROPERTY()
 	TArray<FChunkSpawnData> ChunkObjects;
 	UPROPERTY()
 	FIntVector LastUpdateDirection;
+
+	FGraphEventArray UpdateTasksList;
+	//UProceduralMeshComponent* Mesh;
 };

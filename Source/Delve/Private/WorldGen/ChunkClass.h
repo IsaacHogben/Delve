@@ -65,15 +65,14 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int Lod = 1;
 	TObjectPtr<UMaterialInterface> Material;
-	UPROPERTY(EditAnywhere, Category = "Chunk")
-	float Frequency = 0.03;
+
+	// Terrain
+	UPROPERTY(EditAnywhere, Category = "Terrain Settings")
+	float Frequency = 0.012;
 
 	UFUNCTION(BlueprintCallable, Category = "Chunk")
 	void ModifyVoxel(const FIntVector Position, const EBlock Block);
 
-	//void ChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition); 
-	//void ChunkPositionUpdate(const FVector PlayerPosition, const FIntVector NewChunkPosition);
-	//void UpdateChunkPosition(FIntVector ChunkVectorPosition);
 	void StartAsyncChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition);
 	void StartAsyncChunkPositionUpdate(const FVector PlayerPosition, const FIntVector NewChunkPosition);
 

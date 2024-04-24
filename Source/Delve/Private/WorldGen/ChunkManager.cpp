@@ -23,28 +23,29 @@ AChunkManager::~AChunkManager()
 
 void AChunkManager::UpdatePlayerChunkPosition(const FVector& PlayerPosition)
 {
+	FGraphEventRef UpdateTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, PlayerPosition]() {
+		UpdatePlayerChunkPositionAsync(PlayerPosition);
+		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
+	
+	UpdateTasksList.Add(UpdateTask);
+}
+
+void AChunkManager::UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition)
+{
 	UE_LOG(LogTemp, Warning, TEXT("Updating..."));
 	bool UpdateDirection = false;
 	FIntVector NewPlayerChunkPosition = VectorFunctionUtils::FVectorToFIntVector(PlayerPosition);
-	UE_LOG(LogTemp, Warning, TEXT("NewPlayerChunkPosition %d,%d,%d"), NewPlayerChunkPosition.X, NewPlayerChunkPosition.Y, NewPlayerChunkPosition.Z);
-	UE_LOG(LogTemp, Warning, TEXT("PreviousPlayerChunkPosition %d,%d,%d"), PreviousPlayerChunkPosition.X, PreviousPlayerChunkPosition.Y, PreviousPlayerChunkPosition.Z);
 
 	FIntVector Direction = NewPlayerChunkPosition - PreviousPlayerChunkPosition;
 	if (Direction != FIntVector(0, 0, 0))
-	{
-		
+	{		
 		TArray<FIntVector> AvailablePositions;
 		TArray<FChunkSpawnData*> AvailableChunks;
-		//UE_LOG(LogTemp, Warning, TEXT("Getting direction"));
-		//LastUpdateDirection = Direction;
 		
 		for (int i = 0; i < ChunkObjects.Num(); i++)
 		{
 			float OutChunkDistance = FIntVectorDistance(NewPlayerChunkPosition, ChunkObjects[i].Position);
 			float InChunkDistance = FIntVectorDistance(PreviousPlayerChunkPosition, ChunkObjects[i].Position + Direction);
-			//UE_LOG(LogTemp, Warning, TEXT("chunkat %d,%d,%d"), ChunkObjects[i].Position.X, ChunkObjects[i].Position.Y, ChunkObjects[i].Position.Z);
-			//UE_LOG(LogTemp, Warning, TEXT("despawndistance %f"), OutChunkDistance);
-			//UE_LOG(LogTemp, Warning, TEXT("spawndistance %f"), InChunkDistance);
 
 			if (InChunkDistance > RenderDistance)// Get a list of new positions to fill with available chunks
 			{
@@ -59,21 +60,15 @@ void AChunkManager::UpdatePlayerChunkPosition(const FVector& PlayerPosition)
 				ChunkObjects[i].Chunk->StartAsyncChunkLodUpdate(RenderDistance, OutChunkDistance, PlayerPosition);
 		}
 
-		UE_LOG(LogTemp, Warning, TEXT("AvailableChunks %d, AvailablePositions %d"), AvailableChunks.Num(), AvailablePositions.Num());
-
 		int i = 0;
 		for (auto& instance : AvailableChunks)// Match available positions and chunks and update.
 		{
-			//UE_LOG(LogTemp, Warning, TEXT("before %d,%d,%d"), instance->Position.X, instance->Position.Y, instance->Position.Z);
 			instance->Position = AvailablePositions[i++];
-			//UE_LOG(LogTemp, Warning, TEXT("after %d,%d,%d"), instance->Position.X, instance->Position.Y, instance->Position.Z);
 			instance->Chunk->StartAsyncChunkPositionUpdate(PlayerPosition, instance->Position);
-			//ChunkObjects.Add(instance);
 		}
 	}
-	
 	PreviousPlayerChunkPosition = NewPlayerChunkPosition;
-	//UE_LOG(LogTemp, Warning, TEXT("%d Chunks Updated."), i);
+	UE_LOG(LogTemp, Warning, TEXT("Update finished"));
 }
 
 // Called when the game starts or when spawned
@@ -86,7 +81,9 @@ void AChunkManager::BeginPlay()
 
 void AChunkManager::GenerateChunks(FIntVector CentralRenderChunkVector)
 {
-	//UE_LOG(LogTemp, Warning, TEXT("ebebeb"));
+	//Create the Mesh component
+	//Mesh = NewObject<UProceduralMeshComponent>(this);
+
 	ChunkRenderDistance crd(RenderDistance);
 	TArray<FChunkSpawnData> dataArray = crd.CalculateRenderSphere();
 	int i = 0;
@@ -118,8 +115,9 @@ void AChunkManager::SpawnChunk(FChunkSpawnData data, FIntVector CentralRenderChu
 
 UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod)
 {
-	// Create a new procedural mesh component
+	// Create a new procedural mesh component	
 	UProceduralMeshComponent* Mesh = NewObject<UProceduralMeshComponent>(this);
+
 	if (Mesh)
 	{		
 		// Attach the new mesh component to the root component or any other existing component of the actor
@@ -129,9 +127,8 @@ UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData* MeshD
 		//Mesh->SetMobility(EComponentMobility::Static);		
 		TObjectPtr<UMaterialInterface> Material;
 		Mesh->SetMaterial(0, Material);
-
-		if (Vertexes)
-			UpdateMeshSection(Mesh, MeshData, Transform, Lod);
+		
+		UpdateMeshSection(Mesh, MeshData, Transform, Lod, Vertexes);
 
 		// Optionally, you can also register the component with the scene so it can be rendered and updated
 		Mesh->RegisterComponent();
@@ -145,9 +142,16 @@ UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData* MeshD
 	return Mesh;
 }
 
-void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData* MeshData, FVector Transform, int Lod)
+void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData* MeshData, FVector Transform, int Lod, int Vertexes)
 {
+	//RuntimeMeshComponent
 	Mesh->ClearAllMeshSections();
+	if (!Vertexes)
+	{
+		//UE_LOG(LogTemp, Warning, TEXT("Skipped chunk with %d Vertexes"), Vertexes);
+		return;
+	}	
+
 	// Calculate Transform
 	auto MeshTransform = FTransform(
 		FRotator::ZeroRotator,
