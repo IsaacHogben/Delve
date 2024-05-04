@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "ChunkInclude.h"
 #include "ChunkRenderDistance.h"
+#include "ProceduralTerrain.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -70,7 +71,7 @@ public:
 
 	// Terrain
 	UPROPERTY(EditAnywhere, Category = "Terrain Settings")
-	float Frequency = 0.012;
+	float Frequency = 0.015;
 
 	UFUNCTION(BlueprintCallable, Category = "Chunk")
 	void ModifyVoxel(const FIntVector Position, const EBlock Block);

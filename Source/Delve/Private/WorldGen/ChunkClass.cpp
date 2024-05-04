@@ -422,24 +422,17 @@ void UChunkClass::ModifyVoxelData(const FIntVector Position, const EBlock Block)
 void UChunkClass::GenerateBlocksFromNoise(FVector Position)
 {
 	IsChunkEmpty = true;
-
+	EBlock Block;
 	for (int x = 0; x < ChunkSize + 2; ++x)
 	{
 		for (int y = 0; y < ChunkSize + 2; ++y)
 		{
 			for (int z = 0; z < ChunkSize + 2; ++z)
 			{
-				const auto NoiseValue = Noise->GetNoise(x + Position.X, y + Position.Y, z + Position.Z);
-
-				if (NoiseValue >= 0)
-				{
-					Blocks[GetBlockIndex(x, y, z)] = EBlock::Air;
-				}
-				else
-				{
-					Blocks[GetBlockIndex(x, y, z)] = EBlock::Grass;
+				Block = ProceduralTerrain::GetBlock(x + Position.X, y + Position.Y, z + Position.Z, Noise);
+				Blocks[GetBlockIndex(x, y, z)] = Block;
+				if (Block != EBlock::Air)
 					IsChunkEmpty = false;
-				}
 			}
 		}
 	}
@@ -452,7 +445,6 @@ int UChunkClass::GetBlockIndex(int X, int Y, int Z) const
 
 EBlock UChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
 {
-
 	//Could remove this you want Blocks to be initialized at size equal to Lod.
 	Index *= Lod;
 	Index += FIntVector(1, 1, 1);
@@ -489,8 +481,8 @@ int UChunkClass::GetTextureIndex(EBlock Block, FVector Normal) const
 	switch (Block) {
 	case EBlock::Grass:
 	{
-		if (Normal == FVector::UpVector) return 0;
-		return 2;
+		//if (Normal == FVector::UpVector) return 0; how to have different faces on one block
+		return 0;
 	}
 	case EBlock::Dirt: return 2;
 	case EBlock::Stone: return 1;
