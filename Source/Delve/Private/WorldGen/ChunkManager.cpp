@@ -6,10 +6,15 @@
 // Sets default values
 AChunkManager::AChunkManager()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
 	PreviousPlayerChunkPosition = FIntVector();
 	LastUpdateDirection = FIntVector();
+
+	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	PrimaryActorTick.bCanEverTick = true;
+	//PrimaryActorTick.TickInterval = 0.1f;
+	// 
+	//UpdateMeshDelegate.BindUFunction(this, FName("UpdateMeshSection"));
+
 }
 
 AChunkManager::~AChunkManager()
@@ -23,11 +28,11 @@ AChunkManager::~AChunkManager()
 
 void AChunkManager::UpdatePlayerChunkPosition(const FVector& PlayerPosition)
 {
-	FGraphEventRef UpdateTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, PlayerPosition]() {
+	//FGraphEventRef UpdateTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, PlayerPosition]() {
 		UpdatePlayerChunkPositionAsync(PlayerPosition);
-		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
+		//}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
 	
-	UpdateTasksList.Add(UpdateTask);
+	//UpdateTasksList.Add(UpdateTask);
 }
 
 void AChunkManager::UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition)
@@ -59,15 +64,17 @@ void AChunkManager::UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition
 			else //if not update render distance
 				ChunkObjects[i].Chunk->StartAsyncChunkLodUpdate(RenderDistance, OutChunkDistance, PlayerPosition);
 		}
+		UE_LOG(LogTemp, Warning, TEXT("Positions: %d/n Chunks: %d"), AvailablePositions.Num(), AvailableChunks.Num());
 
 		int i = 0;
-		for (auto& instance : AvailableChunks)// Match available positions and chunks and update.
+		for (auto& chunk : AvailableChunks)// Match available positions and chunks and update.
 		{
-			instance->Position = AvailablePositions[i++];
-			instance->Chunk->StartAsyncChunkPositionUpdate(PlayerPosition, instance->Position);
+			chunk->Position = AvailablePositions[i++];
+			chunk->Chunk->StartAsyncChunkPositionUpdate(PlayerPosition, chunk->Position);
 		}
 	}
 	PreviousPlayerChunkPosition = NewPlayerChunkPosition;
+	
 	UE_LOG(LogTemp, Warning, TEXT("Update finished"));
 }
 
@@ -75,7 +82,6 @@ void AChunkManager::UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition
 void AChunkManager::BeginPlay()
 {
 	Super::BeginPlay();
-
 	GenerateChunks(PreviousPlayerChunkPosition);
 }
 
@@ -89,21 +95,24 @@ void AChunkManager::GenerateChunks(FIntVector CentralRenderChunkVector)
 	int i = 0;
 	for (FChunkSpawnData& data : dataArray)
 	{
-		SpawnChunk(data, CentralRenderChunkVector);
+		SpawnChunk(data, CentralRenderChunkVector, i);
 		i++;
 	}
+	ChunkObjects.Sort();
 	UE_LOG(LogTemp, Warning, TEXT("%d Chunks Spawned."), i);
 
 }
 
-void AChunkManager::SpawnChunk(FChunkSpawnData data, FIntVector CentralRenderChunkVector)
+void AChunkManager::SpawnChunk(FChunkSpawnData data, FIntVector CentralRenderChunkVector, int i)
 {
 	FIntVector position = (data.Position + CentralRenderChunkVector) * ChunkSize;
 	UChunkClass* chunk = NewObject<UChunkClass>();//TODO can move this assignments to the constructor
 	chunk->ChunkManager = this;
+	chunk->Frequency = MainFreqency;
 	chunk->Lod = data.Lod;
 	chunk->ChunkWorldPosition = FVector(position);
 	chunk->CentralRenderChunkVector = CentralRenderChunkVector;
+	chunk->id = i;
 	chunk->BeginPlay();
 
 	FChunkSpawnData ChunkData = FChunkSpawnData();
@@ -125,10 +134,10 @@ UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData* MeshD
 		
 		Mesh->bUseAsyncCooking = true;
 		//Mesh->SetMobility(EComponentMobility::Static);		
-		TObjectPtr<UMaterialInterface> Material;
+
 		Mesh->SetMaterial(0, Material);
 		
-		UpdateMeshSection(Mesh, MeshData, Transform, Lod, Vertexes);
+		EnqueueMeshUpdate(Mesh, *MeshData, Transform, Lod, Vertexes);
 
 		// Optionally, you can also register the component with the scene so it can be rendered and updated
 		Mesh->RegisterComponent();
@@ -142,13 +151,12 @@ UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData* MeshD
 	return Mesh;
 }
 
-void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData* MeshData, FVector Transform, int Lod, int Vertexes)
+void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector Transform, int Lod, int Vertexes)
 {
-	//RuntimeMeshComponent
-	Mesh->ClearAllMeshSections();
 	if (!Vertexes)
 	{
 		//UE_LOG(LogTemp, Warning, TEXT("Skipped chunk with %d Vertexes"), Vertexes);
+		Mesh->ClearAllMeshSections();
 		return;
 	}	
 
@@ -172,21 +180,49 @@ void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMesh
 	}
 	Mesh->CreateMeshSection(
 		0,
-		MeshData->Vertices,
-		MeshData->Triangles,
-		MeshData->Normals,
-		MeshData->UV0,
-		MeshData->Colors,
+		MeshData.Vertices,
+		MeshData.Triangles,
+		MeshData.Normals,
+		MeshData.UV0,
+		MeshData.Colors,
 		TArray<FProcMeshTangent>(),
 		true
 	);
-	//UE_LOG(LogTemp, Warning, TEXT("updatedmesh"));
-	//timer.LogTime();
+
+	MeshData.Clear();
+	//UE_LOG(LogTemp, Warning, TEXT("Updated Mesh with %d Vertexes"), Vertexes);
+
+}
+
+// Enqueue a mesh update function
+void AChunkManager::EnqueueMeshUpdate(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector ChunkWorldPosition, int Lod, int VertexCount)
+{
+	FQueuedMeshUpdate Update = FQueuedMeshUpdate();
+	Update.Mesh = Mesh;
+	Update.MeshData = MeshData;
+	Update.Transform = ChunkWorldPosition;
+	Update.Lod = Lod;
+	Update.Vertexes = VertexCount;
+
+	MeshUpdateQueue.Enqueue(Update);
 }
 
 // Called every frame
 void AChunkManager::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	// Define the maximum number of updates to process per tick
+	const int32 MaxUpdatesPerTick = 1; // Adjust as needed
+	// Counter to track the number of updates processed
+	int32 UpdatesProcessedThisTick = 0;
+	while (!MeshUpdateQueue.IsEmpty() && UpdatesProcessedThisTick < MaxUpdatesPerTick)
+	{	
+		FQueuedMeshUpdate Update;
+		MeshUpdateQueue.Dequeue(Update);
+
+		UpdateMeshSection(Update.Mesh, Update.MeshData, Update.Transform, Update.Lod, Update.Vertexes);
+		
+		UpdatesProcessedThisTick++;
+	}
 }
 

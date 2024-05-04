@@ -12,7 +12,7 @@ UChunkClass::UChunkClass()
 
 UChunkClass::~UChunkClass()
 {
-	UE_LOG(LogTemp, Error, TEXT("ChunkClass Deconstructor Called!"));
+	//UE_LOG(LogTemp, Error, TEXT("ChunkClass Deconstructor Called!"));
 }
 
 // Called when the game starts or when spawned
@@ -20,17 +20,6 @@ void UChunkClass::BeginPlay()
 {
 	StartAsyncChunkGen(FVector::Zero());
 }
-
-//void UChunkClass::ChunkPositionUpdate(const FVector PlayerPosition, const FIntVector NewChunkPosition)
-//{
-//	UE_LOG(LogTemp, Warning, TEXT("ChunkClass PosUp Called"));
-//}
-//
-//void UChunkClass::ChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition)
-//{	
-//	//UE_LOG(LogTemp, Warning, TEXT("oh lordy"));
-//	StartAsyncChunkLodUpdate(RenderDistance, Distance, PlayerPosition);
-//}
 
 void UChunkClass::Setup()
 {
@@ -62,112 +51,6 @@ void UChunkClass::StartAsyncChunkGen(const FVector& PlayerPosition)
 		GenerateChunkAsyncComplete();
 		}, TStatId(), FirstTask, ENamedThreads::GameThread);
 
-	//FGraphEventArray TasksList;
-	TasksList.Add(FirstTask);
-}
-
-void UChunkClass::StartAsyncChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition)
-{
-	FGraphEventRef NewUpdateTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, RenderDistance, Distance, PlayerPosition]() {
-		UpdateChunkLodAsync(RenderDistance, Distance, PlayerPosition);
-		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
-
-	// Override any outstanding task
-	if (TasksList.Contains(PreviousLodUpdateTask))
-	{
-		TasksList.Remove(PreviousLodUpdateTask);
-	}
-
-	TasksList.Add(NewUpdateTask);
-	PreviousLodUpdateTask = NewUpdateTask;
-}
-
-void UChunkClass::StartAsyncChunkPositionUpdate(const FVector PlayerPosition, const FIntVector NewChunkPosition)
-{
-	FGraphEventRef NewUpdateTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, PlayerPosition, NewChunkPosition]() {
-		UpdateChunkPositionAsync(PlayerPosition, NewChunkPosition);
-		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
-
-	TasksList.Add(NewUpdateTask);
-}
-
-void UChunkClass::ModifyVoxelData(const FIntVector Position, const EBlock Block)
-{
-	const int Index = GetBlockIndex(Position.X, Position.Y, Position.Z);
-
-	Blocks[Index] = Block;
-}
-
-void UChunkClass::GenerateBlocksFromNoise(FVector Position)
-{
-	FastNoiseLite CellNoise = FastNoiseLite(33253);
-	CellNoise.SetFrequency(Frequency);
-	CellNoise.SetNoiseType(FastNoiseLite::NoiseType_Cellular);
-	CellNoise.SetFractalType(FastNoiseLite::FractalType_None);
-	CellNoise.SetCellularReturnType(FastNoiseLite::CellularReturnType_Distance2Div);
-	CellNoise.SetCellularDistanceFunction(FastNoiseLite::CellularDistanceFunction_Manhattan);
-
-	for (int x = 0; x < ChunkSize + 2; ++x)
-	{
-		for (int y = 0; y < ChunkSize + 2; ++y)
-		{
-			for (int z = 0; z < ChunkSize + 2; ++z)
-			{
-				const auto NoiseValue = Noise->GetNoise(x + Position.X, y + Position.Y, z + Position.Z);
-				const auto CellNoiseValue = CellNoise.GetNoise(x + Position.X, y + Position.Y, 0.0);
-
-				//if (z + Position.Z > CellNoiseValue * 64)
-					//Blocks[GetBlockIndex(x, y, z)] = EBlock::Air;
-				if (NoiseValue >= 0)
-				{
-					Blocks[GetBlockIndex(x, y, z)] = EBlock::Air;
-				}
-				else
-				{
-					Blocks[GetBlockIndex(x, y, z)] = EBlock::Stone;
-					IsChunkEmpty = false;
-				}
-			}
-		}
-	}
-}
-
-int UChunkClass::GetBlockIndex(int X, int Y, int Z) const
-{
-	return Z * (ChunkSize + 2) * (ChunkSize + 2) + Y * (ChunkSize + 2) + X;
-}
-
-EBlock UChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
-{
-
-	//Could remove this you want Blocks to be initialized at size equal to Lod.
-	Index *= Lod;
-	Index += FIntVector(1, 1, 1);
-
-	//Manages requests for blocks that are outside of the array
-	// Was changed from ChunkSize + 2 to fix holes in higher LODS // TODO investigate impact on performance further
-	if (Index.X >= ChunkSize + 1 || Index.Y >= ChunkSize + 1 || Index.Z >= ChunkSize + 1 || Index.X <= 0 || Index.Y <= 0 || Index.Z <= 0)
-	{
-		if (!checkOutsideChunks) //Used for checks that dont break thread saftey
-		{		
-			for (int i = 0; i < 3; i++)
-			{
-				if (Index[i] >= ChunkSize + 2)
-					Index[i] = ChunkSize + 1;
-				else if (Index[i] < 0)
-					Index[i] = 0;
-			}
-			if (Lod > 1) //Filld Gaps in low LOD Chunks
-				return EBlock::Air;
-		}
-		else// IE check for block in another chunk TODO	
-		{
-			UE_LOG(LogTemp, Error, TEXT("Attempting to read blocks outside chunk"));
-			return EBlock::Air; 
-		}
-	}
-	// Else returns request from within the array
-	return Blocks[GetBlockIndex(Index.X, Index.Y, Index.Z)];
 }
 
 void UChunkClass::GenerateChunkAsync(const FVector& PlayerPosition)
@@ -183,12 +66,27 @@ void UChunkClass::GenerateChunkAsyncComplete()
 	Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
 }
 
+void UChunkClass::StartAsyncChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition)
+{
+
+	FGraphEventRef NewUpdateTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, RenderDistance, Distance, PlayerPosition]() {
+		UpdateChunkLodAsync(RenderDistance, Distance, PlayerPosition);
+		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
+}
+
+void UChunkClass::StartAsyncChunkPositionUpdate(const FVector PlayerPosition, const FIntVector NewChunkPosition)
+{
+	//PreviousPosUpdateTask = nullptr;
+	FGraphEventRef NewUpdateTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, PlayerPosition, NewChunkPosition]() {
+		UpdateChunkPositionAsync(PlayerPosition, NewChunkPosition);
+		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundHiPriTask);
+
+}
+
 void UChunkClass::UpdateChunkLodAsync(int RenderDistance, const float Distance, const FVector PlayerPosition)
 {
-	//God Code do not Touch
-	std::this_thread::sleep_for(std::chrono::nanoseconds(Lod - 1));
-
-	//Setup
+	if (IsChunkEmpty)
+		return;
 	bool ContinueToUpdate = false;
 
 	GetLod(RenderDistance, Distance, ContinueToUpdate);
@@ -196,7 +94,7 @@ void UChunkClass::UpdateChunkLodAsync(int RenderDistance, const float Distance, 
 
 	if (!ContinueToUpdate)
 		return;
-	
+
 	ClearMeshData();
 	GenerateMesh();
 
@@ -205,7 +103,7 @@ void UChunkClass::UpdateChunkLodAsync(int RenderDistance, const float Distance, 
 		}, TStatId(), nullptr, ENamedThreads::GameThread);
 
 	//FGraphEventArray TasksList;
-	TasksList.Add(CompletionCallback);
+	//TasksList.Add(CompletionCallback);
 }
 
 void UChunkClass::GetLod(int RenderDistance, const float& Distance, bool& ContinueToUpdate)
@@ -249,23 +147,21 @@ void UChunkClass::UpdateChunkPositionAsync(const FVector PlayerPosition, const F
 
 	//Get Blocks for new position
 	GenerateBlocksFromNoise(ChunkWorldPosition);
-
-	UpdatePerspectiveMask(PlayerPosition, ContinueToUpdate);
-
 	ClearMeshData();
-	GenerateMesh();
+	if (!IsChunkEmpty)
+	{
+		UpdatePerspectiveMask(PlayerPosition, ContinueToUpdate);
+		GenerateMesh();
+	}
 
 	FGraphEventRef CompletionCallback = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
 		UpdateChunkAsyncComplete();
 		}, TStatId(), nullptr, ENamedThreads::GameThread);
-
-	//FGraphEventArray TasksList;
-	TasksList.Add(CompletionCallback);
 }
 
 void UChunkClass::UpdateChunkAsyncComplete()
 {
-	ChunkManager->UpdateMeshSection(Mesh, MeshData, ChunkWorldPosition, Lod, VertexCount);
+	ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
 }
 
 void UChunkClass::GenerateMesh()
@@ -414,7 +310,6 @@ void UChunkClass::CreateQuad(
 	const FVector V4
 )
 {
-
 	const auto Normal = FVector(AxisMask * Mask.Normal);
 	const auto Color = FColor(0, 0, 0, GetTextureIndex(Mask.Block, Normal));
 
@@ -516,28 +411,99 @@ void UChunkClass::ClearMeshData()
 	MeshData->Clear();
 }
 
+
+void UChunkClass::ModifyVoxelData(const FIntVector Position, const EBlock Block)
+{
+	const int Index = GetBlockIndex(Position.X, Position.Y, Position.Z);
+
+	Blocks[Index] = Block;
+}
+
+void UChunkClass::GenerateBlocksFromNoise(FVector Position)
+{
+	IsChunkEmpty = true;
+
+	for (int x = 0; x < ChunkSize + 2; ++x)
+	{
+		for (int y = 0; y < ChunkSize + 2; ++y)
+		{
+			for (int z = 0; z < ChunkSize + 2; ++z)
+			{
+				const auto NoiseValue = Noise->GetNoise(x + Position.X, y + Position.Y, z + Position.Z);
+
+				if (NoiseValue >= 0)
+				{
+					Blocks[GetBlockIndex(x, y, z)] = EBlock::Air;
+				}
+				else
+				{
+					Blocks[GetBlockIndex(x, y, z)] = EBlock::Grass;
+					IsChunkEmpty = false;
+				}
+			}
+		}
+	}
+}
+
+int UChunkClass::GetBlockIndex(int X, int Y, int Z) const
+{
+	return Z * (ChunkSize + 2) * (ChunkSize + 2) + Y * (ChunkSize + 2) + X;
+}
+
+EBlock UChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
+{
+
+	//Could remove this you want Blocks to be initialized at size equal to Lod.
+	Index *= Lod;
+	Index += FIntVector(1, 1, 1);
+
+	//Manages requests for blocks that are outside of the array
+	// Was changed from ChunkSize + 2 to fix holes in higher LODS // TODO investigate impact on performance further
+	if (Index.X >= ChunkSize + 1 || Index.Y >= ChunkSize + 1 || Index.Z >= ChunkSize + 1 || Index.X <= 0 || Index.Y <= 0 || Index.Z <= 0)
+	{
+		if (!checkOutsideChunks) //Used for checks that dont break thread saftey
+		{
+			for (int i = 0; i < 3; i++)
+			{
+				if (Index[i] >= ChunkSize + 2)
+					Index[i] = ChunkSize + 1;
+				else if (Index[i] < 0)
+					Index[i] = 0;
+			}
+			if (Lod > 1) //Filld Gaps in low LOD Chunks
+				return EBlock::Air;
+		}
+		else// IE check for block in another chunk TODO	
+		{
+			UE_LOG(LogTemp, Error, TEXT("Attempting to read blocks outside chunk"));
+			return EBlock::Air;
+		}
+	}
+	// Else returns request from within the array
+	return Blocks[GetBlockIndex(Index.X, Index.Y, Index.Z)];
+}
+
+
 int UChunkClass::GetTextureIndex(EBlock Block, FVector Normal) const
 {
 	switch (Block) {
 	case EBlock::Grass:
 	{
 		if (Normal == FVector::UpVector) return 0;
-		return 1;
+		return 2;
 	}
 	case EBlock::Dirt: return 2;
-	case EBlock::Stone: return 3;
+	case EBlock::Stone: return 1;
 	default: return 255;
 	}
 }
 
-void UChunkClass::PostStats(std::chrono::high_resolution_clock::time_point StartTime)
+void UChunkClass::TaskGraphDebugLog()
 {
-	auto EndTime = std::chrono::high_resolution_clock::now();
-	auto Duration = std::chrono::duration_cast<std::chrono::microseconds>(EndTime - StartTime);
-	double DurationMilliseconds = Duration.count() / 1000.0;
-	double DurationSeconds = Duration.count() / 1000000.0;
-	// Log the duration
-	UE_LOG(LogTemp, Warning, TEXT("Lod: %d | Vertexes: %d | Execution time: %f milliseconds"), Lod, VertexCount, DurationMilliseconds);
+	for (const auto Task : TasksList)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("task %d"), Task.GetReference());
+	}
 }
 
 void UChunkClass::ModifyVoxel(const FIntVector Position, const EBlock Block)

@@ -5,8 +5,8 @@
 #include "CoreMinimal.h"
 #include "ChunkRenderDistance.h"
 #include "ChunkInclude.h"
+
 #include "../Utils/ChunkMeshData.h"
-//#include "../Utils/ChunkSpawnData.h"
 #include "../Utils/VectorFunctionUtils.h"
 
 #include <iostream>
@@ -15,6 +15,7 @@
 
 class UChunkClass;
 struct FChunkSpawnData;
+struct FQueuedMeshUpdate;
 
 UCLASS()
 class AChunkManager : public AActor
@@ -30,27 +31,34 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Chunk Manager")
 	void UpdatePlayerChunkPosition(const FVector& Position);
 
-	int ChunkSize = 32;
+	int ChunkSize = 64;
 	int WorldScale = 50;
-	UPROPERTY(EditAnywhere, Category = "ChunkManager")
+
+	UPROPERTY(EditAnywhere, Category = "Quality")
 	int RenderDistance = 1;
+
+	UPROPERTY(EditAnywhere, Category = "Generation Settings")
+	float MainFreqency = 0.015;
+
+	UPROPERTY(EditAnywhere, Category = "Generation Settings")
+	TObjectPtr<UMaterialInterface> Material;
+
 	UProceduralMeshComponent* CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod);
 
-	void UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData* MeshData, FVector Transform, int Lod, int Vertices);
+	void UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector Transform, int Lod, int Vertices);
 	
 	UPROPERTY()
 	FIntVector PreviousPlayerChunkPosition;
+
+	void EnqueueMeshUpdate(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector ChunkWorldPosition, int Lod, int VertexCount);
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 	void GenerateChunks(FIntVector CenterPoint);
-	void SpawnChunk(FChunkSpawnData dataArray, FIntVector CentralRenderChunkVector);
+	void SpawnChunk(FChunkSpawnData dataArray, FIntVector CentralRenderChunkVector, int id);
 
 private:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-
 	void UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition);
 
 	UPROPERTY()
@@ -59,5 +67,9 @@ private:
 	FIntVector LastUpdateDirection;
 
 	FGraphEventArray UpdateTasksList;
+
+	TQueue<FQueuedMeshUpdate> MeshUpdateQueue;
 	//UProceduralMeshComponent* Mesh;
+	// Called every frame
+	virtual void Tick(float DeltaTime) override;
 };

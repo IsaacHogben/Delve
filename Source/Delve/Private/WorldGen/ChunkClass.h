@@ -43,13 +43,15 @@ public:
 	
 	void BeginPlay();
 	
+	int id;
+
 	UPROPERTY()
 	AChunkManager* ChunkManager;
 	UPROPERTY()
 	UProceduralMeshComponent* Mesh;
 	//Variables
 	UPROPERTY(EditAnywhere, Category = "Chunk")
-	int ChunkSize = 32;
+	int ChunkSize = 64;
 	int BlockSize = 50;
 	int WorldScale = 50;
 	
@@ -95,12 +97,13 @@ private:
 	TArray<EBlock> Blocks;
 	UPROPERTY()
 	TArray<FIntVector> PerspectiveMask;
+	//UPROPERTY()
 	FChunkMeshData* MeshData;
 	bool IsChunkEmpty = true;
-
 	
 	//Async Tasks
-	FGraphEventRef PreviousLodUpdateTask = nullptr;
+	//FGraphEventRef InitialSpawnTask = nullptr;
+	//FGraphEventRef PreviousPosUpdateTask = nullptr;
 	FGraphEventArray TasksList;
 	void GenerateChunkAsync(const FVector& PlayerPosition);
 	void GenerateChunkAsyncComplete();
@@ -125,5 +128,6 @@ private:
 	TArray<FIntVector> CalculatePerspectiveMask(FVector PlayerPosition);
 	bool CompareNormalMask(FIntVector Normal);
 	int GetTextureIndex(EBlock Block, FVector Normal) const;
-	void PostStats(std::chrono::high_resolution_clock::time_point StartTime);
+
+	void TaskGraphDebugLog();
 };

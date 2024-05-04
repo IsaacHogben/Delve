@@ -29,3 +29,16 @@ public:
 		return false;
 	}
 };
+
+USTRUCT()
+struct FQueuedMeshUpdate
+{
+	GENERATED_BODY();
+
+public:
+	UProceduralMeshComponent* Mesh;
+	FChunkMeshData MeshData;
+	FVector Transform;
+	int Lod;
+	int Vertexes;
+};
