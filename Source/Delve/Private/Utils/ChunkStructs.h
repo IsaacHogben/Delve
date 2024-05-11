@@ -7,6 +7,30 @@
 class UChunkClass;
 
 USTRUCT()
+struct FBlockUpdate
+{
+	GENERATED_BODY();
+
+public:
+	FIntVector TargetChunk;
+	FIntVector DispatchChunk;
+	FIntVector Position;
+	EBlock Block;
+
+	// Constructor with all parameters
+	FBlockUpdate(const FIntVector& InTargetChunk = FIntVector::ZeroValue,
+		const FIntVector& InDispatchChunk = FIntVector::ZeroValue,
+		const FIntVector& InPosition = FIntVector::ZeroValue,
+		EBlock InBlock = EBlock::Null)
+		: TargetChunk(InTargetChunk),
+		DispatchChunk(InDispatchChunk),
+		Position(InPosition),
+		Block(InBlock)
+	{
+	}
+};
+
+USTRUCT()
 struct FChunkSpawnData
 {
 	GENERATED_BODY();
@@ -16,6 +40,8 @@ public:
 	FIntVector Position;
 	UPROPERTY()
 	TObjectPtr<UChunkClass> Chunk;
+	TArray<FBlockUpdate> QueuedBlockUpdates;
+	int CompletedGenerationLayer = 0;
 
 	bool operator<(const FChunkSpawnData& Other) const
 	{

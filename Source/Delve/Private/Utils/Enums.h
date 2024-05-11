@@ -11,3 +11,9 @@ enum class EBlock : uint8
 {
 	Null, Air, Stone, Dirt, Grass
 };
+
+UENUM(BlueprintType)
+enum class EDeliverUpdateDirection : uint8
+{
+	None, North, South, East, West, Up, Down
+};

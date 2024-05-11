@@ -14,6 +14,7 @@ public:
 	~VectorFunctionUtils();
 
 	static FIntVector FVectorToFIntVector(const FVector& InVector);
+	static FIntVector FIntVectorMultiply(const FIntVector& InVector, float f);
 };
 
 static float FIntVectorDistance(const FIntVector& Vector1, const FIntVector& Vector2)
@@ -29,4 +30,13 @@ static float FIntVectorDistance(const FIntVector& Vector1, const FIntVector& Vec
 	float Distance = FMath::Sqrt(DeltaX * DeltaX + DeltaY * DeltaY + DeltaZ * DeltaZ);
 
 	return Distance;
+}
+
+static FIntVector FIntVectorMultiply(const FIntVector& InVector, int i)
+{
+	int X = InVector.X * i;
+	int Y = InVector.Y * i;
+	int Z = InVector.Z * i;
+
+	return FIntVector(X, Y, Z);
 }

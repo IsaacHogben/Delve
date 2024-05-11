@@ -28,11 +28,7 @@ AChunkManager::~AChunkManager()
 
 void AChunkManager::UpdatePlayerChunkPosition(const FVector& PlayerPosition)
 {
-	//FGraphEventRef UpdateTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, PlayerPosition]() {
-		UpdatePlayerChunkPositionAsync(PlayerPosition);
-		//}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
-	
-	//UpdateTasksList.Add(UpdateTask);
+	//UpdatePlayerChunkPositionAsync(PlayerPosition);
 }
 
 void AChunkManager::UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition)
@@ -99,6 +95,7 @@ void AChunkManager::GenerateChunks(FIntVector CentralRenderChunkVector)
 		i++;
 	}
 	ChunkObjects.Sort();
+	TotalChunks = i;
 	UE_LOG(LogTemp, Warning, TEXT("%d Chunks Spawned."), i);
 
 }
@@ -205,6 +202,40 @@ void AChunkManager::EnqueueMeshUpdate(UProceduralMeshComponent* Mesh, FChunkMesh
 	Update.Vertexes = VertexCount;
 
 	MeshUpdateQueue.Enqueue(Update);
+}
+
+void AChunkManager::DistributeBulkChunkUpdates(TArray<FBlockUpdate> BlockUpdates)
+{
+	int n = 0;
+	for (int j = 0; j < ChunkObjects.Num(); j++)
+	{
+		for (int i = 0; i < BlockUpdates.Num(); i++)
+		{
+			if (ChunkObjects[j].Position == BlockUpdates[i].TargetChunk)
+			{
+				ChunkObjects[j].QueuedBlockUpdates.Add(FBlockUpdate(BlockUpdates[i].TargetChunk, BlockUpdates[i].DispatchChunk, BlockUpdates[i].Position, BlockUpdates[i].Block));
+				UE_LOG(LogTemp, Warning, TEXT("Enqueued %d.%d.%d"), BlockUpdates[i].Position.X, BlockUpdates[i].Position.Y, BlockUpdates[i].Position.Z);
+				n++;
+				//UE_LOG(LogTemp, Warning, TEXT("Enqueued %d"), ChunkObjects[j].QueuedBlockUpdates.Num());
+			}
+		}
+	}
+}
+
+void AChunkManager::UpdateChunkGenerationLayerStatus()
+{
+	if (++ChunksCompletedLayerOneGenration == TotalChunks)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Layer 1 complete"));
+		for (int j = 0; j < ChunkObjects.Num(); j++)
+		{
+			//UE_LOG(LogTemp, Warning, TEXT("que %d"), ChunkObjects[j].QueuedBlockUpdates.Num());
+			ChunkObjects[j].Chunk->ModifyVoxels(ChunkObjects[j].QueuedBlockUpdates, true);
+			ChunkObjects[j].QueuedBlockUpdates.Empty();
+		}
+	}	
+	//UE_LOG(LogTemp, Warning, TEXT("ChunksCompletedLayerOneGenration: %d"), ChunksCompletedLayerOneGenration);
+	//UE_LOG(LogTemp, Warning, TEXT("Total Chunks: %d"), TotalChunks);
 }
 
 // Called every frame

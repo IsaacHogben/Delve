@@ -15,6 +15,7 @@
 
 class UChunkClass;
 struct FChunkSpawnData;
+struct FBlockUpdate;
 struct FQueuedMeshUpdate;
 
 UCLASS()
@@ -52,13 +53,19 @@ public:
 
 	void EnqueueMeshUpdate(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector ChunkWorldPosition, int Lod, int VertexCount);
 
+	void DistributeBulkChunkUpdates(TArray<FBlockUpdate> BlockUpdates);
+	void UpdateChunkGenerationLayerStatus();
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 	void GenerateChunks(FIntVector CenterPoint);
 	void SpawnChunk(FChunkSpawnData dataArray, FIntVector CentralRenderChunkVector, int id);
 
-private:	
+private:
+	int TotalChunks;
+	int ChunksCompletedLayerOneGenration; //use array when more layers are nescessary.
+
 	void UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition);
 
 	UPROPERTY()

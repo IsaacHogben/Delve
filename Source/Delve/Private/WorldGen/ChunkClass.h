@@ -21,6 +21,8 @@
 class UProceduralMeshComponent;
 class AChunkManager; // Forward declaration of AChunkManager
 
+struct FBlockUpdate;
+
 USTRUCT()
 struct FMask
 {
@@ -50,6 +52,7 @@ public:
 	AChunkManager* ChunkManager;
 	UPROPERTY()
 	UProceduralMeshComponent* Mesh;
+
 	//Variables
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int ChunkSize = 64;
@@ -74,7 +77,8 @@ public:
 	float Frequency = 0.015;
 
 	UFUNCTION(BlueprintCallable, Category = "Chunk")
-	void ModifyVoxel(const FIntVector Position, const EBlock Block);
+	FIntVector ModifyVoxel(const FIntVector Position, const EBlock Block, bool RegenerateMesh);
+	void ModifyVoxels(const TArray<FBlockUpdate> BlockUpdates, bool RegenerateMesh);
 
 	void StartAsyncChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition);
 	void StartAsyncChunkPositionUpdate(const FVector PlayerPosition, const FIntVector NewChunkPosition);
@@ -88,7 +92,7 @@ protected:
 	
 
 	void ModifyVoxelData(const FIntVector Position, const EBlock Block);
-	void GenerateBlocksFromNoise(FVector Position);
+	void GenerateProceduralTerrain(FVector Position);
 	FastNoiseLite* Noise;
 
 	UPROPERTY()
@@ -96,16 +100,16 @@ protected:
 
 private:
 	TArray<EBlock> Blocks;
+	
+
 	UPROPERTY()
 	TArray<FIntVector> PerspectiveMask;
-	//UPROPERTY()
-	FChunkMeshData* MeshData;
-	bool IsChunkEmpty = true;
-	
-	//Async Tasks
-	//FGraphEventRef InitialSpawnTask = nullptr;
-	//FGraphEventRef PreviousPosUpdateTask = nullptr;
 	FGraphEventArray TasksList;
+	FChunkMeshData* MeshData;
+	
+	bool IsChunkEmpty = true;
+
+
 	void GenerateChunkAsync(const FVector& PlayerPosition);
 	void GenerateChunkAsyncComplete();
 
@@ -123,7 +127,7 @@ private:
 	void ClearMeshData();
 
 	//Utils
-	int GetBlockIndex(int X, int Y, int Z) const;
+	//int GetBlockIndex(int X, int Y, int Z) const;
 	EBlock GetBlock(FIntVector Index, bool checkOutsideChunk);
 	bool CompareMask(const FMask M1, const FMask M2) const;
 	TArray<FIntVector> CalculatePerspectiveMask(FVector PlayerPosition);
@@ -131,4 +135,5 @@ private:
 	int GetTextureIndex(EBlock Block, FVector Normal) const;
 
 	void TaskGraphDebugLog();
+
 };
