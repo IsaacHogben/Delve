@@ -436,27 +436,17 @@ EBlock UChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
 {
 	//Could remove this you want Blocks to be initialized at size equal to Lod.
 	Index *= Lod;
-	Index += FIntVector(1, 1, 1);
+	//Index += FIntVector(1, 1, 1);
 
+	//UE_LOG(LogTemp, Warning, TEXT("%d.%d.%d"), Index.X, Index.Y, Index.Z);
 	//Manages requests for blocks that are outside of the array
-	// Was changed from ChunkSize + 2 to fix holes in higher LODS // TODO investigate impact on performance further
-	if (Index.X >= ChunkSize + 1 || Index.Y >= ChunkSize + 1 || Index.Z >= ChunkSize + 1 || Index.X <= 0 || Index.Y <= 0 || Index.Z <= 0)
+	if (Index.X >= ChunkSize || Index.Y >= ChunkSize || Index.Z >= ChunkSize || Index.X < 0 || Index.Y < 0 || Index.Z < 0)
 	{
-		if (!checkOutsideChunks) //Used for checks that dont break thread saftey
-		{
-			for (int i = 0; i < 3; i++)
-			{
-				if (Index[i] >= ChunkSize + 2)
-					Index[i] = ChunkSize + 1;
-				else if (Index[i] < 0)
-					Index[i] = 0;
-			}
-			if (Lod > 1) //Filld Gaps in low LOD Chunks
-				return EBlock::Air;
-		}
+		if (Lod > 1) //Filld Gaps in low LOD Chunks
+			return EBlock::Air;
 		else// IE check for block in another chunk TODO	
 		{
-			UE_LOG(LogTemp, Error, TEXT("Attempting to read blocks outside chunk"));
+			//UE_LOG(LogTemp, Error, TEXT("Attempting to read blocks outside chunk"));
 			return EBlock::Air;
 		}
 	}
@@ -493,9 +483,9 @@ FIntVector UChunkClass::ModifyVoxel(const FIntVector Position, const EBlock Bloc
 	{
 		if (Position[i] <= 0)
 			Redirect[i]--;
-		else if (Position[i] >= ChunkSize + 1)
+		else if (Position[i] > ChunkSize)
 			Redirect[i]++;
-		if (Position[i] >= 0 && Position[i] <= ChunkSize + 1)
+		if (Position[i] >= 0 && Position[i] <= ChunkSize)
 			BoundsCount++;
 	}
 

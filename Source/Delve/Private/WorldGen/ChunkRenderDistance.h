@@ -6,7 +6,7 @@
 #include "Utils/Enums.h"
 #include "Utils/ChunkStructs.h"
 
-struct FChunkSpawnData;
+struct FChunkData;
 
 class ChunkRenderDistance
 {
@@ -15,7 +15,7 @@ public:
 	ChunkRenderDistance(int RenderDistance);
 	~ChunkRenderDistance();
 
-	TArray<FChunkSpawnData> CalculateRenderSphere();
+	TArray<FChunkData> CalculateRenderSphere();
 	int CalculateLod(float Distance);
 
 

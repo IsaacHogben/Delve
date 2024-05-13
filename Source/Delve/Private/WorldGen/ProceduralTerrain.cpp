@@ -14,8 +14,8 @@ ProceduralTerrain::~ProceduralTerrain()
 int ProceduralTerrain::GetBlockIndex(int X, int Y, int Z)
 {
 	int ChunkSize = 64;
-	int IndexSize = 287496;
-	int r = Z * (ChunkSize + 2) * (ChunkSize + 2) + Y * (ChunkSize + 2) + X;
+	int IndexSize = 262144;
+	int r = Z * ChunkSize * ChunkSize + Y * ChunkSize + X;
 	if (r >= IndexSize)
 		return 0; //get outside chunk!
 	return r;
@@ -23,6 +23,8 @@ int ProceduralTerrain::GetBlockIndex(int X, int Y, int Z)
 
 EBlock ProceduralTerrain::GetTerrainBlock(float x, float y, float z, FastNoiseLite* Noise)
 {
+	
+	//if (1) return EBlock::Air;
 	const auto SurfaceValue = Noise->GetNoise(x, y, 0.0f);
 	const auto Value = Noise->GetNoise(x, y, z);
 	const auto UpValue = Noise->GetNoise(x, y, z + 1);
@@ -54,11 +56,11 @@ TArray<FBlockUpdate> ProceduralTerrain::GetGeneratedChunk(FVector ChunkPosition,
 	TArray<FBlockUpdate> BlockUpdates;
 	IsChunkEmpty = false; //WILL NEVER TRIGER! TODO
 	EBlock Block;
-	for (int x = 0; x < ChunkSize + 2; ++x)
+	for (int x = 0; x < ChunkSize; ++x)
 	{
-		for (int y = 0; y < ChunkSize + 2; ++y)
+		for (int y = 0; y < ChunkSize; ++y)
 		{
-			for (int z = 0; z < ChunkSize + 2; ++z)
+			for (int z = 0; z < ChunkSize ; ++z)
 			{
 				Block = ProceduralTerrain::GetTerrainBlock(x + ChunkPosition.X, y + ChunkPosition.Y, z + ChunkPosition.Z, Noise);
 				BlockArray[GetBlockIndex(x, y, z)] = Block;
@@ -69,9 +71,9 @@ TArray<FBlockUpdate> ProceduralTerrain::GetGeneratedChunk(FVector ChunkPosition,
 	}
 	if (IsChunkEmpty)
 		return BlockUpdates;
-	AddReferencelessDecorations(BlockArray, Noise, BlockUpdates);
+	//AddReferencelessDecorations(BlockArray, Noise, BlockUpdates);
 	//MakeTestShape(BlockUpdates, 0,0,0);
-	UpdateDispatchInfoForBlockUpdates(BlockUpdates, ChunkVectorPosition);
+	//UpdateDispatchInfoForBlockUpdates(BlockUpdates, ChunkVectorPosition);
 	return BlockUpdates;
 }
 
@@ -103,8 +105,8 @@ void ProceduralTerrain::AddReferencelessDecorations(TArray<EBlock>& BlockArray, 
 				//check for condition and make changes
 				if (Block == EBlock::Grass && BlockArray[GetBlockIndex(x, y, z + 1)] == EBlock::Air)
 				{
-					if (FMath::RandRange(0, 124) == 0)
-						MakeTestShape(BlockUpdates, x, y, z + 1);
+					//if (FMath::RandRange(0, 124) == 0)
+						//MakeTestShape(BlockUpdates, x, y, z + 1);
 				}
 			}
 		}

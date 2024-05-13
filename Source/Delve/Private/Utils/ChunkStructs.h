@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "../WorldGen/ChunkClass.h"
+#include "../WorldGen/Octree.h"
 #include "ChunkStructs.Generated.h"
 
 class UChunkClass;
@@ -31,7 +32,7 @@ public:
 };
 
 USTRUCT()
-struct FChunkSpawnData
+struct FChunkData
 {
 	GENERATED_BODY();
 
@@ -41,9 +42,10 @@ public:
 	UPROPERTY()
 	TObjectPtr<UChunkClass> Chunk;
 	TArray<FBlockUpdate> QueuedBlockUpdates;
+	FOctree<EBlock>* Blocks;
 	int CompletedGenerationLayer = 0;
 
-	bool operator<(const FChunkSpawnData& Other) const
+	bool operator<(const FChunkData& Other) const
 	{
 		// Compare LOD first
 		if (Lod < Other.Lod)

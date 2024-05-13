@@ -22,6 +22,7 @@ class UProceduralMeshComponent;
 class AChunkManager; // Forward declaration of AChunkManager
 
 struct FBlockUpdate;
+struct FChunkData;
 
 USTRUCT()
 struct FMask
@@ -52,6 +53,8 @@ public:
 	AChunkManager* ChunkManager;
 	UPROPERTY()
 	UProceduralMeshComponent* Mesh;
+
+	FChunkData* ChunkData;
 
 	//Variables
 	UPROPERTY(EditAnywhere, Category = "Chunk")

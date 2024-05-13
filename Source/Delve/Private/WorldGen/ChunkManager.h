@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "ChunkRenderDistance.h"
 #include "ChunkInclude.h"
+#include "Octree.h"
 
 #include "../Utils/ChunkMeshData.h"
 #include "../Utils/VectorFunctionUtils.h"
@@ -14,7 +15,7 @@
 #include "ChunkManager.generated.h"
 
 class UChunkClass;
-struct FChunkSpawnData;
+struct FChunkData;
 struct FBlockUpdate;
 struct FQueuedMeshUpdate;
 
@@ -60,7 +61,7 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 	void GenerateChunks(FIntVector CenterPoint);
-	void SpawnChunk(FChunkSpawnData dataArray, FIntVector CentralRenderChunkVector, int id);
+	void SpawnChunk(FChunkData dataArray, FIntVector CentralRenderChunkVector, int id);
 
 private:
 	int TotalChunks;
@@ -69,7 +70,7 @@ private:
 	void UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition);
 
 	UPROPERTY()
-	TArray<FChunkSpawnData> ChunkObjects;
+	TArray<FChunkData> ChunkObjects;
 	UPROPERTY()
 	FIntVector LastUpdateDirection;
 

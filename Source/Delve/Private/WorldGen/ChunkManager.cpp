@@ -14,6 +14,7 @@ AChunkManager::AChunkManager()
 	//PrimaryActorTick.TickInterval = 0.1f;
 	// 
 	//UpdateMeshDelegate.BindUFunction(this, FName("UpdateMeshSection"));
+	
 
 }
 
@@ -29,6 +30,24 @@ AChunkManager::~AChunkManager()
 void AChunkManager::UpdatePlayerChunkPosition(const FVector& PlayerPosition)
 {
 	//UpdatePlayerChunkPositionAsync(PlayerPosition);
+
+	//Octree Test
+	//FOctree<EBlock> Octree(FRegion(FPoint(0,0,0), FPoint(ChunkSize, ChunkSize, ChunkSize)), EBlock::Null);
+
+	//FPoint p1 = { 64,64,64 };
+	//FPoint p2 = { 19,26,37 };
+
+	//Octree.Insert(p1, EBlock::Dirt);
+
+	//EBlock QueryResult = Octree.QueryPoint(p1);
+	//EBlock QueryResult2 = Octree.QueryPoint(p1);
+	//EBlock QueryResult3 = Octree.QueryPoint(p2);
+
+	//// Print the query result
+	//UE_LOG(LogTemp, Warning, TEXT("Block Value: %d"), QueryResult);
+	//UE_LOG(LogTemp, Warning, TEXT("Block Value: %d"), QueryResult2);
+	//UE_LOG(LogTemp, Warning, TEXT("Block Value: %d"), QueryResult3);
+
 }
 
 void AChunkManager::UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition)
@@ -41,7 +60,7 @@ void AChunkManager::UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition
 	if (Direction != FIntVector(0, 0, 0))
 	{		
 		TArray<FIntVector> AvailablePositions;
-		TArray<FChunkSpawnData*> AvailableChunks;
+		TArray<FChunkData*> AvailableChunks;
 		
 		for (int i = 0; i < ChunkObjects.Num(); i++)
 		{
@@ -87,9 +106,9 @@ void AChunkManager::GenerateChunks(FIntVector CentralRenderChunkVector)
 	//Mesh = NewObject<UProceduralMeshComponent>(this);
 
 	ChunkRenderDistance crd(RenderDistance);
-	TArray<FChunkSpawnData> dataArray = crd.CalculateRenderSphere();
+	TArray<FChunkData> dataArray = crd.CalculateRenderSphere();
 	int i = 0;
-	for (FChunkSpawnData& data : dataArray)
+	for (FChunkData& data : dataArray)
 	{
 		SpawnChunk(data, CentralRenderChunkVector, i);
 		i++;
@@ -100,7 +119,7 @@ void AChunkManager::GenerateChunks(FIntVector CentralRenderChunkVector)
 
 }
 
-void AChunkManager::SpawnChunk(FChunkSpawnData data, FIntVector CentralRenderChunkVector, int i)
+void AChunkManager::SpawnChunk(FChunkData data, FIntVector CentralRenderChunkVector, int i)
 {
 	FIntVector position = (data.Position + CentralRenderChunkVector) * ChunkSize;
 	UChunkClass* chunk = NewObject<UChunkClass>();//TODO can move this assignments to the constructor
@@ -112,11 +131,14 @@ void AChunkManager::SpawnChunk(FChunkSpawnData data, FIntVector CentralRenderChu
 	chunk->id = i;
 	chunk->BeginPlay();
 
-	FChunkSpawnData ChunkData = FChunkSpawnData();
-	ChunkData.Lod = data.Lod;
-	ChunkData.Position = data.Position;
-	ChunkData.Chunk = chunk;
-	ChunkObjects.Add(ChunkData);
+	FChunkData* ChunkData =  new FChunkData();
+	ChunkData->Lod = data.Lod;
+	ChunkData->Position = data.Position;
+	ChunkData->Chunk = chunk;
+	ChunkData->Blocks = new FOctree<EBlock>(FRegion(FPoint(0,0,0), FPoint(ChunkSize, ChunkSize, ChunkSize)), EBlock::Null);
+	chunk->ChunkData = ChunkData;
+
+	ChunkObjects.Add(*ChunkData);
 }
 
 UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod)

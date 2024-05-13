@@ -14,12 +14,12 @@ ChunkRenderDistance::~ChunkRenderDistance()
 }
 
 //Defines the initial play zone for the chunk manager
-TArray<FChunkSpawnData> ChunkRenderDistance::CalculateRenderSphere()
+TArray<FChunkData> ChunkRenderDistance::CalculateRenderSphere()
 {
-	TArray<FChunkSpawnData> chunkSpawnData;
+	TArray<FChunkData> chunkSpawnData;
 
 	FVector PlayerPosition = FVector(0, 0, 0);
-	TArray<FChunkSpawnData> dataArray;
+	TArray<FChunkData> dataArray;
 
 	for (int z = -MaxRenderDistance; z <= MaxRenderDistance; z++)
 	{
@@ -30,7 +30,7 @@ TArray<FChunkSpawnData> ChunkRenderDistance::CalculateRenderSphere()
 				float distance = FVectorDistance(PlayerPosition, FVector(x, y, z));
 				if (distance <= MaxRenderDistance)
 				{
-					FChunkSpawnData data;
+					FChunkData data;
 					data.Position = FIntVector(x, y, z);
 					data.Lod = CalculateLod(distance);
 					dataArray.Add(data);
