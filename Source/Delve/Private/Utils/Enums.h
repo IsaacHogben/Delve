@@ -13,6 +13,12 @@ enum class EBlock : uint8
 };
 
 UENUM(BlueprintType)
+enum class EGenerationLayer : uint8
+{
+	EmptyChunk, TerrainLayer, InterChunkLayer
+};
+
+UENUM(BlueprintType)
 enum class EDeliverUpdateDirection : uint8
 {
 	None, North, South, East, West, Up, Down

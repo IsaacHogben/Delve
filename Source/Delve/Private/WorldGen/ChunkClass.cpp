@@ -23,7 +23,7 @@ void UChunkClass::BeginPlay()
 
 void UChunkClass::Setup()
 {
-	Blocks.SetNum((ChunkSize + 2) * (ChunkSize + 2) * (ChunkSize + 2));
+	ChunkData->Blocks.SetNum((ChunkSize) * (ChunkSize) * (ChunkSize));
 	MeshData = new FChunkMeshData();
 
 	Noise = new FastNoiseLite(33253);
@@ -56,15 +56,14 @@ void UChunkClass::StartAsyncChunkGen(const FVector& PlayerPosition)
 void UChunkClass::GenerateChunkAsync(const FVector& PlayerPosition)
 {
 	Setup();
+
 	GenerateProceduralTerrain(ChunkWorldPosition);
-	//if (!IsChunkEmpty)
-		//GenerateMesh();
 }
 
 void UChunkClass::GenerateChunkAsyncComplete()
 {
-	ChunkManager->UpdateChunkGenerationLayerStatus();
-	//Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
+	//ChunkManager->UpdateChunkGenerationLayerStatus();
+	Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
 }
 
 void UChunkClass::StartAsyncChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition)
@@ -412,24 +411,10 @@ void UChunkClass::ClearMeshData()
 
 void UChunkClass::GenerateProceduralTerrain(FVector ChunkPosition)
 {
-	TArray<FBlockUpdate> BlockUpdates = ProceduralTerrain::GetGeneratedChunk(ChunkPosition, ChunkVectorPosition, ChunkSize, Blocks, Noise, IsChunkEmpty);
+	TArray<FBlockUpdate> BlockUpdates = ProceduralTerrain::GetGeneratedChunk(ChunkPosition, ChunkVectorPosition, ChunkSize, ChunkData->Blocks, Noise, IsChunkEmpty);
 	ModifyVoxels(BlockUpdates, false);
-
-	/*IsChunkEmpty = true;
-	EBlock Block;
-	for (int x = 0; x < ChunkSize + 2; ++x)
-	{
-		for (int y = 0; y < ChunkSize + 2; ++y)
-		{
-			for (int z = 0; z < ChunkSize + 2; ++z)
-			{
-				Block = ProceduralTerrain::GetBlock(x + ChunkPosition.X, y + ChunkPosition.Y, z + ChunkPosition.Z, Noise);
-				Blocks[GetBlockIndex(x, y, z)] = Block;
-				if (Block != EBlock::Air)
-					IsChunkEmpty = false;
-			}
-		}
-	}*/
+	ChunkData->GenerationLayer = EGenerationLayer::TerrainLayer;
+	GenerateMesh();
 }
 
 EBlock UChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
@@ -440,18 +425,24 @@ EBlock UChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
 
 	//UE_LOG(LogTemp, Warning, TEXT("%d.%d.%d"), Index.X, Index.Y, Index.Z);
 	//Manages requests for blocks that are outside of the array
-	if (Index.X >= ChunkSize || Index.Y >= ChunkSize || Index.Z >= ChunkSize || Index.X < 0 || Index.Y < 0 || Index.Z < 0)
+	//if (Index.X >= ChunkSize || Index.Y >= ChunkSize || Index.Z >= ChunkSize || Index.X < 0 || Index.Y < 0 || Index.Z < 0)
+	//{
+	//	if (Lod > 1) //Filld Gaps in low LOD Chunks
+	//		return EBlock::Air;
+	//	else// IE check for block in another chunk TODO	
+	//	{
+	//		//UE_LOG(LogTemp, Error, TEXT("Attempting to read blocks outside chunk"));
+	//		return EBlock::Air;
+	//	}
+	//}
+	FIntVector TargetChunk = GetBlockChunkAndIndex(Index);
+	if (TargetChunk != ChunkVectorPosition)
 	{
-		if (Lod > 1) //Filld Gaps in low LOD Chunks
-			return EBlock::Air;
-		else// IE check for block in another chunk TODO	
-		{
-			//UE_LOG(LogTemp, Error, TEXT("Attempting to read blocks outside chunk"));
-			return EBlock::Air;
-		}
+		//UE_LOG(LogTemp, Error, TEXT("Attempting to read blocks outside chunk"));
+		return EBlock::Air;
 	}
 	// Else returns request from within the array
-	return Blocks[ProceduralTerrain::GetBlockIndex(Index.X, Index.Y, Index.Z)];
+	return ChunkData->Blocks[ProceduralTerrain::GetBlockIndex(Index.X, Index.Y, Index.Z)];
 }
 
 int UChunkClass::GetTextureIndex(EBlock Block, FVector Normal) const
@@ -472,20 +463,40 @@ void UChunkClass::ModifyVoxelData(const FIntVector Position, const EBlock Block)
 {
 	const int Index = ProceduralTerrain::GetBlockIndex(Position.X, Position.Y, Position.Z);
 
-	Blocks[Index] = Block;
+	ChunkData->Blocks[Index] = Block;
 }
 
-FIntVector UChunkClass::ModifyVoxel(const FIntVector Position, const EBlock Block, bool RegenerateMesh)
+FIntVector UChunkClass::GetBlockChunkAndIndex(FIntVector& Index)
+{
+	FIntVector RedirectChunk = ChunkVectorPosition;
+	//int BoundsCount = 0;
+	for (int i = 0; i < 3; i++)
+	{
+		if (Index[i] < 0)
+		{
+			RedirectChunk[i]--;
+			Index[i] += ChunkSize;
+		}
+		else if (Index[i] >= ChunkSize)
+		{
+			RedirectChunk[i]++;
+			Index[i] -= ChunkSize;
+		}
+	}
+	return RedirectChunk;
+}
+
+FIntVector UChunkClass::ModifyVoxel(const FIntVector Position, const EBlock& Block, bool RegenerateMesh)
 {
 	FIntVector Redirect = FIntVector::ZeroValue;
 	int BoundsCount = 0;
 	for (int i = 0; i < 3; i++)
 	{
-		if (Position[i] <= 0)
+		if (Position[i] < 0)
 			Redirect[i]--;
-		else if (Position[i] > ChunkSize)
+		else if (Position[i] >= ChunkSize)
 			Redirect[i]++;
-		if (Position[i] >= 0 && Position[i] <= ChunkSize)
+		if (Position[i] >= 0 && Position[i] < ChunkSize)
 			BoundsCount++;
 	}
 

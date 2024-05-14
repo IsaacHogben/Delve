@@ -69,11 +69,10 @@ TArray<FBlockUpdate> ProceduralTerrain::GetGeneratedChunk(FVector ChunkPosition,
 			}
 		}
 	}
-	if (IsChunkEmpty)
-		return BlockUpdates;
-	//AddReferencelessDecorations(BlockArray, Noise, BlockUpdates);
+
+	AddReferencelessDecorations(BlockArray, Noise, BlockUpdates);
 	//MakeTestShape(BlockUpdates, 0,0,0);
-	//UpdateDispatchInfoForBlockUpdates(BlockUpdates, ChunkVectorPosition);
+	UpdateDispatchInfoForBlockUpdates(BlockUpdates, ChunkVectorPosition);
 	return BlockUpdates;
 }
 
@@ -105,8 +104,9 @@ void ProceduralTerrain::AddReferencelessDecorations(TArray<EBlock>& BlockArray, 
 				//check for condition and make changes
 				if (Block == EBlock::Grass && BlockArray[GetBlockIndex(x, y, z + 1)] == EBlock::Air)
 				{
-					//if (FMath::RandRange(0, 124) == 0)
-						//MakeTestShape(BlockUpdates, x, y, z + 1);
+					if (FMath::RandRange(0, 124) == 0)
+						MakeTestShape(BlockUpdates, x, y, z + 1);
+					UE_LOG(LogTemp, Warning, TEXT("Made Tree"));
 				}
 			}
 		}

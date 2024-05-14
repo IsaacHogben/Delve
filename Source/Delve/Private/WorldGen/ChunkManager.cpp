@@ -24,30 +24,12 @@ AChunkManager::~AChunkManager()
 		delete instance;
 	}
 	ChunkInstances.clear();*/
-
+	UE_LOG(LogTemp, Error, TEXT("ChunkManager Deconstrusctor Called!"));
 }
 
 void AChunkManager::UpdatePlayerChunkPosition(const FVector& PlayerPosition)
 {
 	//UpdatePlayerChunkPositionAsync(PlayerPosition);
-
-	//Octree Test
-	//FOctree<EBlock> Octree(FRegion(FPoint(0,0,0), FPoint(ChunkSize, ChunkSize, ChunkSize)), EBlock::Null);
-
-	//FPoint p1 = { 64,64,64 };
-	//FPoint p2 = { 19,26,37 };
-
-	//Octree.Insert(p1, EBlock::Dirt);
-
-	//EBlock QueryResult = Octree.QueryPoint(p1);
-	//EBlock QueryResult2 = Octree.QueryPoint(p1);
-	//EBlock QueryResult3 = Octree.QueryPoint(p2);
-
-	//// Print the query result
-	//UE_LOG(LogTemp, Warning, TEXT("Block Value: %d"), QueryResult);
-	//UE_LOG(LogTemp, Warning, TEXT("Block Value: %d"), QueryResult2);
-	//UE_LOG(LogTemp, Warning, TEXT("Block Value: %d"), QueryResult3);
-
 }
 
 void AChunkManager::UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition)
@@ -102,24 +84,29 @@ void AChunkManager::BeginPlay()
 
 void AChunkManager::GenerateChunks(FIntVector CentralRenderChunkVector)
 {
-	//Create the Mesh component
-	//Mesh = NewObject<UProceduralMeshComponent>(this);
-
 	ChunkRenderDistance crd(RenderDistance);
 	TArray<FChunkData> dataArray = crd.CalculateRenderSphere();
-	int i = 0;
+	int NumberOfChunks = 0;
 	for (FChunkData& data : dataArray)
 	{
-		SpawnChunk(data, CentralRenderChunkVector, i);
-		i++;
+		SpawnChunk(data, CentralRenderChunkVector);
+		NumberOfChunks++;
+	}
+	dataArray.Empty();
+	for (FChunkData& data : ChunkObjects)
+	{		
+		if (GetSixPointers(data))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Found all neighbours for Chunk %d.%d.%d"), data.Position.X, data.Position.Y, data.Position.Z);
+			data.Chunk->BeginPlay();
+		}		
 	}
 	ChunkObjects.Sort();
-	TotalChunks = i;
-	UE_LOG(LogTemp, Warning, TEXT("%d Chunks Spawned."), i);
-
+	TotalChunks = NumberOfChunks;
+	UE_LOG(LogTemp, Warning, TEXT("%d Chunks Spawned."), NumberOfChunks);
 }
 
-void AChunkManager::SpawnChunk(FChunkData data, FIntVector CentralRenderChunkVector, int i)
+void AChunkManager::SpawnChunk(FChunkData data, FIntVector CentralRenderChunkVector)
 {
 	FIntVector position = (data.Position + CentralRenderChunkVector) * ChunkSize;
 	UChunkClass* chunk = NewObject<UChunkClass>();//TODO can move this assignments to the constructor
@@ -127,15 +114,12 @@ void AChunkManager::SpawnChunk(FChunkData data, FIntVector CentralRenderChunkVec
 	chunk->Frequency = MainFreqency;
 	chunk->Lod = data.Lod;
 	chunk->ChunkWorldPosition = FVector(position);
-	chunk->CentralRenderChunkVector = CentralRenderChunkVector;
-	chunk->id = i;
-	chunk->BeginPlay();
 
-	FChunkData* ChunkData =  new FChunkData();
+	FChunkData* ChunkData = new FChunkData();
 	ChunkData->Lod = data.Lod;
 	ChunkData->Position = data.Position;
 	ChunkData->Chunk = chunk;
-	ChunkData->Blocks = new FOctree<EBlock>(FRegion(FPoint(0,0,0), FPoint(ChunkSize, ChunkSize, ChunkSize)), EBlock::Null);
+	//ChunkData->Blocks.SetNum((ChunkSize) * (ChunkSize) * (ChunkSize));
 	chunk->ChunkData = ChunkData;
 
 	ChunkObjects.Add(*ChunkData);
@@ -236,7 +220,7 @@ void AChunkManager::DistributeBulkChunkUpdates(TArray<FBlockUpdate> BlockUpdates
 			if (ChunkObjects[j].Position == BlockUpdates[i].TargetChunk)
 			{
 				ChunkObjects[j].QueuedBlockUpdates.Add(FBlockUpdate(BlockUpdates[i].TargetChunk, BlockUpdates[i].DispatchChunk, BlockUpdates[i].Position, BlockUpdates[i].Block));
-				UE_LOG(LogTemp, Warning, TEXT("Enqueued %d.%d.%d"), BlockUpdates[i].Position.X, BlockUpdates[i].Position.Y, BlockUpdates[i].Position.Z);
+				//UE_LOG(LogTemp, Warning, TEXT("Enqueued %d.%d.%d"), BlockUpdates[i].Position.X, BlockUpdates[i].Position.Y, BlockUpdates[i].Position.Z);
 				n++;
 				//UE_LOG(LogTemp, Warning, TEXT("Enqueued %d"), ChunkObjects[j].QueuedBlockUpdates.Num());
 			}
@@ -258,6 +242,42 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 	}	
 	//UE_LOG(LogTemp, Warning, TEXT("ChunksCompletedLayerOneGenration: %d"), ChunksCompletedLayerOneGenration);
 	//UE_LOG(LogTemp, Warning, TEXT("Total Chunks: %d"), TotalChunks);
+}
+
+EBlock AChunkManager::GetBlockFromChunk(const FIntVector& BlockIndex, const FIntVector& ChunkIndex)
+{
+	return EBlock::Null;
+}
+
+bool AChunkManager::GetSixPointers(FChunkData& Chunk)
+{
+	//UE_LOG(LogTemp, Warning, TEXT("-----------"));
+	//UE_LOG(LogTemp, Warning, TEXT("Searching Chunk %d.%d.%d"), Chunk.Position.X, Chunk.Position.Y, Chunk.Position.Z);
+	for (int i = 0; i < 3; i++)
+	{
+		for (int j = -1; j < 2; j += 2)
+		{
+			//UE_LOG(LogTemp, Warning, TEXT("j %d"), j);
+			FIntVector Direction = FIntVector::ZeroValue;
+			Direction[i] += j;
+			FChunkData* Neighbour = ChunkObjects.FindByPredicate([&](const FChunkData& ChunkData) {
+				//UE_LOG(LogTemp, Warning, TEXT("ChunkData %d.%d.%d"), ChunkData.Position.X, ChunkData.Position.Y, ChunkData.Position.Z);
+				//UE_LOG(LogTemp, Warning, TEXT("Direction %d.%d.%d"), Chunk.Position.X + Direction.X, Chunk.Position.Y + Direction.Y, Chunk.Position.Z + Direction.Z);
+				return ChunkData.Position == Chunk.Position + Direction;
+				});
+			if (Neighbour)
+			{
+				//UE_LOG(LogTemp, Warning, TEXT("gp"));
+				Chunk.NeighbourChunks.Add(Neighbour);
+			}
+			else
+			{
+				Chunk.NeighbourChunks.Empty();
+				return false;
+			}
+		}
+	}
+	return true;
 }
 
 // Called every frame

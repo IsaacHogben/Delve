@@ -42,8 +42,9 @@ public:
 	UPROPERTY()
 	TObjectPtr<UChunkClass> Chunk;
 	TArray<FBlockUpdate> QueuedBlockUpdates;
-	FOctree<EBlock>* Blocks;
-	int CompletedGenerationLayer = 0;
+	TArray<EBlock> Blocks;
+	TArray<FChunkData*> NeighbourChunks;
+	EGenerationLayer GenerationLayer = EGenerationLayer::EmptyChunk;
 
 	bool operator<(const FChunkData& Other) const
 	{
@@ -56,6 +57,7 @@ public:
 		// LOD is less than Other.Lod
 		return false;
 	}
+
 };
 
 USTRUCT()

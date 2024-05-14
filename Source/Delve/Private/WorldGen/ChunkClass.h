@@ -46,8 +46,6 @@ public:
 	~UChunkClass();
 	
 	void BeginPlay();
-	
-	int id;
 
 	UPROPERTY()
 	AChunkManager* ChunkManager;
@@ -68,9 +66,6 @@ public:
 	UPROPERTY()// Represents the chunks position vector as whole number;
 	FIntVector ChunkVectorPosition;
 
-	UPROPERTY()// Represents the center of the latest chunk render sphere. Used as reference around when moving chunks
-	FIntVector CentralRenderChunkVector;
-
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int Lod = 1;
 	TObjectPtr<UMaterialInterface> Material;
@@ -80,7 +75,7 @@ public:
 	float Frequency = 0.015;
 
 	UFUNCTION(BlueprintCallable, Category = "Chunk")
-	FIntVector ModifyVoxel(const FIntVector Position, const EBlock Block, bool RegenerateMesh);
+	FIntVector ModifyVoxel(const FIntVector Position, const EBlock& Block, bool RegenerateMesh);
 	void ModifyVoxels(const TArray<FBlockUpdate> BlockUpdates, bool RegenerateMesh);
 
 	void StartAsyncChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition);
@@ -102,7 +97,7 @@ protected:
 	int VertexCount = 0;
 
 private:
-	TArray<EBlock> Blocks;
+
 	
 
 	UPROPERTY()
@@ -132,6 +127,7 @@ private:
 	//Utils
 	//int GetBlockIndex(int X, int Y, int Z) const;
 	EBlock GetBlock(FIntVector Index, bool checkOutsideChunk);
+	FIntVector GetBlockChunkAndIndex(FIntVector& Index);
 	bool CompareMask(const FMask M1, const FMask M2) const;
 	TArray<FIntVector> CalculatePerspectiveMask(FVector PlayerPosition);
 	bool CompareNormalMask(FIntVector Normal);

@@ -56,12 +56,13 @@ public:
 
 	void DistributeBulkChunkUpdates(TArray<FBlockUpdate> BlockUpdates);
 	void UpdateChunkGenerationLayerStatus();
+	EBlock GetBlockFromChunk(const FIntVector& BlockIndex, const FIntVector& ChunkIndex);
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 	void GenerateChunks(FIntVector CenterPoint);
-	void SpawnChunk(FChunkData dataArray, FIntVector CentralRenderChunkVector, int id);
+	void SpawnChunk(FChunkData dataArray, FIntVector CentralRenderChunkVector);
 
 private:
 	int TotalChunks;
@@ -75,6 +76,7 @@ private:
 	FIntVector LastUpdateDirection;
 
 	FGraphEventArray UpdateTasksList;
+	bool GetSixPointers(FChunkData& Chunk);
 
 	TQueue<FQueuedMeshUpdate> MeshUpdateQueue;
 	//UProceduralMeshComponent* Mesh;
