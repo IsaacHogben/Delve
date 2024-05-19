@@ -12,18 +12,18 @@ UChunkClass::UChunkClass()
 
 UChunkClass::~UChunkClass()
 {
-	//UE_LOG(LogTemp, Error, TEXT("ChunkClass Deconstructor Called!"));
+	UE_LOG(LogTemp, Error, TEXT("ChunkClass Deconstructor Called!"));
 }
 
-// Called when the game starts or when spawned
-void UChunkClass::BeginPlay()
+void UChunkClass::BeginGeneration()
 {
 	StartAsyncChunkGen(FVector::Zero());
 }
 
+// Setup of the chunk class. Only done once
 void UChunkClass::Setup()
 {
-	ChunkData->Blocks.SetNum((ChunkSize) * (ChunkSize) * (ChunkSize));
+	
 	MeshData = new FChunkMeshData();
 
 	Noise = new FastNoiseLite(33253);
@@ -32,7 +32,7 @@ void UChunkClass::Setup()
 	Noise->SetFractalType(FastNoiseLite::FractalType_FBm);
 
 	//ChunkWorldPosition = ChunkWorldPosition;
-	ChunkVectorPosition = FIntVector(
+	ChunkData->Position = FIntVector(
 		FMath::RoundToInt(ChunkWorldPosition.X),
 		FMath::RoundToInt(ChunkWorldPosition.Y),
 		FMath::RoundToInt(ChunkWorldPosition.Z)) / ChunkSize;
@@ -56,19 +56,17 @@ void UChunkClass::StartAsyncChunkGen(const FVector& PlayerPosition)
 void UChunkClass::GenerateChunkAsync(const FVector& PlayerPosition)
 {
 	Setup();
-
-	GenerateProceduralTerrain(ChunkWorldPosition);
+	GenerateProceduralTerrain();
 }
 
 void UChunkClass::GenerateChunkAsyncComplete()
 {
-	//ChunkManager->UpdateChunkGenerationLayerStatus();
-	Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
+	ChunkManager->UpdateChunkGenerationLayerStatus(ChunkData->GenerationLayer);
+	//Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
 }
 
 void UChunkClass::StartAsyncChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition)
 {
-
 	FGraphEventRef NewUpdateTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, RenderDistance, Distance, PlayerPosition]() {
 		UpdateChunkLodAsync(RenderDistance, Distance, PlayerPosition);
 		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
@@ -77,6 +75,7 @@ void UChunkClass::StartAsyncChunkLodUpdate(int RenderDistance, const float Dista
 void UChunkClass::StartAsyncChunkPositionUpdate(const FVector PlayerPosition, const FIntVector NewChunkPosition)
 {
 	//PreviousPosUpdateTask = nullptr;
+
 	FGraphEventRef NewUpdateTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, PlayerPosition, NewChunkPosition]() {
 		UpdateChunkPositionAsync(PlayerPosition, NewChunkPosition);
 		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundHiPriTask);
@@ -97,7 +96,7 @@ void UChunkClass::UpdateChunkLodAsync(int RenderDistance, const float Distance, 
 		return;
 
 	ClearMeshData();
-	GenerateMesh();
+	AGenerateMesh();
 
 	FGraphEventRef CompletionCallback = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
 		UpdateChunkAsyncComplete();
@@ -138,22 +137,27 @@ void UChunkClass::UpdatePerspectiveMask(const FVector& PlayerPosition, bool& Con
 void UChunkClass::UpdateChunkPositionAsync(const FVector PlayerPosition, const FIntVector NewChunkPosition)
 {
 	bool ContinueToUpdate = true;
+	if (!ChunkData.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("ChunkData is invalid!"));
+	}
 
 	//Update Position
-	ChunkVectorPosition = NewChunkPosition;
-	ChunkWorldPosition = FVector(ChunkVectorPosition) * ChunkSize;
+	ChunkData->Position = NewChunkPosition;
+	ChunkWorldPosition = FVector(ChunkData->Position) * ChunkSize;
+
 
 	//Get Blocks for new position
-	GenerateProceduralTerrain(ChunkWorldPosition);
-	ClearMeshData();
+	GenerateProceduralTerrain();
+	/*ClearMeshData();
 	if (!IsChunkEmpty)
 	{
 		UpdatePerspectiveMask(PlayerPosition, ContinueToUpdate);
-		GenerateMesh();
-	}
+		AGenerateMesh();
+	}*/
 
 	FGraphEventRef CompletionCallback = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
-		UpdateChunkAsyncComplete();
+		GenerateChunkAsyncComplete();
 		}, TStatId(), nullptr, ENamedThreads::GameThread);
 }
 
@@ -162,7 +166,8 @@ void UChunkClass::UpdateChunkAsyncComplete()
 	ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
 }
 
-void UChunkClass::GenerateMesh()
+// A Prefix implies function is to be run Asynchronously
+void UChunkClass::AGenerateMesh()
 {
 	//UE_LOG(LogTemp, Warning, TEXT("Blocks array accessed. Num elements: %d"), Blocks[99]);
 
@@ -202,8 +207,8 @@ void UChunkClass::GenerateMesh()
 			{
 				for (ChunkItr[Axis1] = 0; ChunkItr[Axis1] < Axis1Limit; ++ChunkItr[Axis1])
 				{
-					const auto CurrentBlock = GetBlock(ChunkItr, 0);
-					const auto CompareBlock = GetBlock(ChunkItr + AxisMask, 0);
+					const auto CurrentBlock = GetBlock(ChunkItr, true);
+					const auto CompareBlock = GetBlock(ChunkItr + AxisMask, true);
 
 					const bool CurrentBlockOpaque = CurrentBlock != EBlock::Air;
 					const bool CompareBlockOpaque = CompareBlock != EBlock::Air;
@@ -297,16 +302,7 @@ void UChunkClass::GenerateMesh()
 	}
 }
 
-void UChunkClass::CreateQuad(
-	const FMask Mask,
-	const FIntVector AxisMask,
-	const int Width,
-	const int Height,
-	const FVector V1,
-	const FVector V2,
-	const FVector V3,
-	const FVector V4
-)
+void UChunkClass::CreateQuad(const FMask Mask, const FIntVector AxisMask, const int Width, const int Height, const FVector V1, const FVector V2, const FVector V3,	const FVector V4 )
 {
 	const auto Normal = FVector(AxisMask * Mask.Normal);
 	const auto Color = FColor(0, 0, 0, GetTextureIndex(Mask.Block, Normal));
@@ -400,7 +396,12 @@ TArray<FIntVector> UChunkClass::CalculatePerspectiveMask(FVector PlayerPosition)
 
 void UChunkClass::ApplyMesh()
 {
-	//Mesh = ChunkManager->CreateMeshSectiosssswn(MeshData, ChunkPosition, VertexCount, Lod);
+	ClearMeshData();
+	AGenerateMesh();
+	if (Mesh)
+		ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
+	else
+		Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
 }
 
 void UChunkClass::ClearMeshData()
@@ -409,37 +410,46 @@ void UChunkClass::ClearMeshData()
 	MeshData->Clear();
 }
 
-void UChunkClass::GenerateProceduralTerrain(FVector ChunkPosition)
+void UChunkClass::ClearMesh()
 {
-	TArray<FBlockUpdate> BlockUpdates = ProceduralTerrain::GetGeneratedChunk(ChunkPosition, ChunkVectorPosition, ChunkSize, ChunkData->Blocks, Noise, IsChunkEmpty);
-	ModifyVoxels(BlockUpdates, false);
-	ChunkData->GenerationLayer = EGenerationLayer::TerrainLayer;
-	GenerateMesh();
+	if (Mesh)
+	{
+		ClearMeshData();
+		ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
+	}
+}
+
+void UChunkClass::GenerateProceduralTerrain()
+{
+	ChunkData->Blocks.SetNum((ChunkSize) * (ChunkSize) * (ChunkSize));
+	TArray<FBlockUpdate> DecoBlockUpdates = ProceduralTerrain::GetGeneratedChunk(ChunkWorldPosition, ChunkData->Position, ChunkSize, ChunkData->Blocks, Noise, IsChunkEmpty);
+
+	ModifyVoxels(DecoBlockUpdates, false);
+
+	//ChunkData->GenerationLayer = EGenerationLayer::TerrainLayer;
 }
 
 EBlock UChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
 {
 	//Could remove this you want Blocks to be initialized at size equal to Lod.
 	Index *= Lod;
-	//Index += FIntVector(1, 1, 1);
-
-	//UE_LOG(LogTemp, Warning, TEXT("%d.%d.%d"), Index.X, Index.Y, Index.Z);
-	//Manages requests for blocks that are outside of the array
-	//if (Index.X >= ChunkSize || Index.Y >= ChunkSize || Index.Z >= ChunkSize || Index.X < 0 || Index.Y < 0 || Index.Z < 0)
-	//{
-	//	if (Lod > 1) //Filld Gaps in low LOD Chunks
-	//		return EBlock::Air;
-	//	else// IE check for block in another chunk TODO	
-	//	{
-	//		//UE_LOG(LogTemp, Error, TEXT("Attempting to read blocks outside chunk"));
-	//		return EBlock::Air;
-	//	}
-	//}
-	FIntVector TargetChunk = GetBlockChunkAndIndex(Index);
-	if (TargetChunk != ChunkVectorPosition)
+	if (checkOutsideChunks)
 	{
-		//UE_LOG(LogTemp, Error, TEXT("Attempting to read blocks outside chunk"));
-		return EBlock::Air;
+		FIntVector TargetChunk = GetBlockChunkAndIndex(Index);
+		if (TargetChunk != ChunkData->Position)
+		{
+			//find neighbour by index TODO
+
+			for (const auto& Neighbour : ChunkData->NeighbourChunks)
+			{
+				if (Neighbour->Position == TargetChunk)
+				{
+					//UE_LOG(LogTemp, Warning, TEXT("Getting block from neighbour"));
+					return Neighbour->Chunk->GetBlock(Index, false);
+				}
+			}
+			UE_LOG(LogTemp, Warning, TEXT("Block Not found in neighbour chunk!"));
+		}
 	}
 	// Else returns request from within the array
 	return ChunkData->Blocks[ProceduralTerrain::GetBlockIndex(Index.X, Index.Y, Index.Z)];
@@ -466,18 +476,19 @@ void UChunkClass::ModifyVoxelData(const FIntVector Position, const EBlock Block)
 	ChunkData->Blocks[Index] = Block;
 }
 
+// Modifies a reference to the block index to represent pos if outside chunk. Returns ChunkPos of new block position
 FIntVector UChunkClass::GetBlockChunkAndIndex(FIntVector& Index)
 {
-	FIntVector RedirectChunk = ChunkVectorPosition;
+	FIntVector RedirectChunk = ChunkData->Position;
 	//int BoundsCount = 0;
 	for (int i = 0; i < 3; i++)
 	{
-		if (Index[i] < 0)
+		while (Index[i] < 0)
 		{
 			RedirectChunk[i]--;
 			Index[i] += ChunkSize;
 		}
-		else if (Index[i] >= ChunkSize)
+		while (Index[i] >= ChunkSize)
 		{
 			RedirectChunk[i]++;
 			Index[i] -= ChunkSize;
@@ -486,57 +497,54 @@ FIntVector UChunkClass::GetBlockChunkAndIndex(FIntVector& Index)
 	return RedirectChunk;
 }
 
-FIntVector UChunkClass::ModifyVoxel(const FIntVector Position, const EBlock& Block, bool RegenerateMesh)
+//
+FIntVector UChunkClass::ModifyVoxel(FIntVector& Position, const EBlock& Block, bool RegenerateMesh)
 {
-	FIntVector Redirect = FIntVector::ZeroValue;
-	int BoundsCount = 0;
-	for (int i = 0; i < 3; i++)
-	{
-		if (Position[i] < 0)
-			Redirect[i]--;
-		else if (Position[i] >= ChunkSize)
-			Redirect[i]++;
-		if (Position[i] >= 0 && Position[i] < ChunkSize)
-			BoundsCount++;
-	}
+	FIntVector RedirectChunk = GetBlockChunkAndIndex(Position);
 
-	/*if (Position.X >= ChunkSize || Position.Y >= ChunkSize || Position.Z >= ChunkSize || Position.X < 0 || Position.Y < 0 || Position.Z < 0)
-	{*/
-
-	if (BoundsCount == 3)
+	if (RedirectChunk == ChunkData->Position)
 	{
 		ModifyVoxelData(Position, Block);
 		if (RegenerateMesh)
 		{
 			ClearMeshData();
-			GenerateMesh();
+			AGenerateMesh();
 			ApplyMesh();
 		}
 	}
-	return Redirect;
+	return RedirectChunk;
 }
 
-// Also handles the redirects so all changes go through here?
-void UChunkClass::ModifyVoxels(const TArray<FBlockUpdate> BlockUpdates, bool RegenerateMesh)
+// Also handles the redirects so all changes go through here. BlockUpdates should be deleted after being sent here.
+void UChunkClass::ModifyVoxels(TArray<FBlockUpdate>& BlockUpdates, bool RegenerateMesh)
 {
+	//UE_LOG(LogTemp, Warning, TEXT("num negihbs in CC %d %d"), ChunkData->NeighbourChunks.Num(), ChunkData->HasSixNeighbours);
+
 	TArray<FBlockUpdate> RedirectBlockUpdates;
-	FIntVector RedirectDirection;
+	FIntVector RedirectChunk;
 	for (int i = 0; i < BlockUpdates.Num(); i++)//not seeing any changes from the second update
 	{
-		RedirectDirection = ModifyVoxel(BlockUpdates[i].Position, BlockUpdates[i].Block, false);
-		if (RedirectDirection != FIntVector::ZeroValue && RedirectDirection != BlockUpdates[i].DispatchChunk)
+		RedirectChunk = ModifyVoxel(BlockUpdates[i].Position, BlockUpdates[i].Block, false);
+		if (RedirectChunk != ChunkData->Position)
 		{
-			RedirectBlockUpdates.Add(FBlockUpdate(RedirectDirection + ChunkVectorPosition, ChunkVectorPosition, BlockUpdates[i].Position - RedirectDirection * (ChunkSize), BlockUpdates[i].Block));
+			RedirectBlockUpdates.Add(FBlockUpdate(RedirectChunk, ChunkData->Position, BlockUpdates[i].Position, BlockUpdates[i].Block));
 		}
 	}
 	ChunkManager->DistributeBulkChunkUpdates(RedirectBlockUpdates);
 	if (RegenerateMesh)
 	{
-		GenerateMesh();
+		ClearMeshData();
+		AGenerateMesh();
 		Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
 	}
 }
 
+void UChunkClass::ModifyVoxelsInterChunkLayer(TArray<FBlockUpdate>& BlockUpdates)
+{
+	ModifyVoxels(BlockUpdates, false);
+	//UE_LOG(LogTemp, Warning, TEXT("Chunk layer update from %d.%d.%d"), ChunkData->Position.X, ChunkData->Position.Y, ChunkData->Position.Z);
+	ChunkManager->UpdateChunkGenerationLayerStatus(ChunkData->GenerationLayer);
+}
 
 void UChunkClass::TaskGraphDebugLog()
 {

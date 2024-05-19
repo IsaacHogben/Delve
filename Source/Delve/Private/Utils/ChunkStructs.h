@@ -38,13 +38,31 @@ struct FChunkData
 
 public:
 	int Lod;
+	UPROPERTY()
 	FIntVector Position;
 	UPROPERTY()
 	TObjectPtr<UChunkClass> Chunk;
+	UPROPERTY()
 	TArray<FBlockUpdate> QueuedBlockUpdates;
+	UPROPERTY()
 	TArray<EBlock> Blocks;
-	TArray<FChunkData*> NeighbourChunks;
-	EGenerationLayer GenerationLayer = EGenerationLayer::EmptyChunk;
+	TArray<TSharedPtr<FChunkData>> NeighbourChunks;
+	bool HasSixNeighbours = false;
+	EGenerationLayer GenerationLayer = EGenerationLayer::TerrainLayer;
+
+	// Default constructor
+	FChunkData()
+		: Lod(1)
+		, Position(FIntVector::ZeroValue)
+		, Chunk(nullptr)
+		, HasSixNeighbours(false)
+		, GenerationLayer(EGenerationLayer::TerrainLayer)
+	{
+	}
+	~FChunkData()
+	{
+		UE_LOG(LogTemp, Error, TEXT("FChunkData Deconstructor Called!"));
+	}
 
 	bool operator<(const FChunkData& Other) const
 	{
@@ -58,6 +76,12 @@ public:
 		return false;
 	}
 
+	// Define hash function for FVector if necessary
+	FORCEINLINE uint32 GetTypeHash(const FIntVector& Vector)
+	{
+		// Simple hash combining example for FVector
+		return HashCombine(HashCombine(::GetTypeHash(Vector.X), ::GetTypeHash(Vector.Y)), ::GetTypeHash(Vector.Z));
+	}
 };
 
 USTRUCT()

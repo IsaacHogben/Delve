@@ -45,14 +45,16 @@ public:
 	UChunkClass();
 	~UChunkClass();
 	
-	void BeginPlay();
+	void BeginGeneration();
+
+	void Setup();
 
 	UPROPERTY()
 	AChunkManager* ChunkManager;
 	UPROPERTY()
 	UProceduralMeshComponent* Mesh;
 
-	FChunkData* ChunkData;
+	TSharedPtr<FChunkData> ChunkData;
 
 	//Variables
 	UPROPERTY(EditAnywhere, Category = "Chunk")
@@ -63,8 +65,8 @@ public:
 	UPROPERTY()// Represents the chunks position in the world. Used for Noise sample pos.
 	FVector ChunkWorldPosition;
 	
-	UPROPERTY()// Represents the chunks position vector as whole number;
-	FIntVector ChunkVectorPosition;
+	//UPROPERTY()// Represents the chunks position vector as whole number;
+	//FIntVector ChunkVectorPosition;
 
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int Lod = 1;
@@ -75,22 +77,22 @@ public:
 	float Frequency = 0.015;
 
 	UFUNCTION(BlueprintCallable, Category = "Chunk")
-	FIntVector ModifyVoxel(const FIntVector Position, const EBlock& Block, bool RegenerateMesh);
-	void ModifyVoxels(const TArray<FBlockUpdate> BlockUpdates, bool RegenerateMesh);
+	FIntVector ModifyVoxel(FIntVector& Position, const EBlock& Block, bool RegenerateMesh);
+	void ModifyVoxels(TArray<FBlockUpdate>& BlockUpdates, bool RegenerateMesh);
+	void ModifyVoxelsInterChunkLayer(TArray<FBlockUpdate>& BlockUpdates);
+	void ApplyMesh();
+	void ClearMesh();
+	EBlock GetBlock(FIntVector Index, bool checkOutsideChunk);
 
 	void StartAsyncChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition);
 	void StartAsyncChunkPositionUpdate(const FVector PlayerPosition, const FIntVector NewChunkPosition);
 
 protected:
-	// Called when the game starts or when spawned
 	
-	void Setup();
-
 	void StartAsyncChunkGen(const FVector& PlayerPosition);
-	
 
 	void ModifyVoxelData(const FIntVector Position, const EBlock Block);
-	void GenerateProceduralTerrain(FVector Position);
+	void GenerateProceduralTerrain();
 	FastNoiseLite* Noise;
 
 	UPROPERTY()
@@ -98,15 +100,12 @@ protected:
 
 private:
 
-	
-
 	UPROPERTY()
 	TArray<FIntVector> PerspectiveMask;
 	FGraphEventArray TasksList;
 	FChunkMeshData* MeshData;
 	
 	bool IsChunkEmpty = true;
-
 
 	void GenerateChunkAsync(const FVector& PlayerPosition);
 	void GenerateChunkAsyncComplete();
@@ -119,14 +118,11 @@ private:
 	void UpdateChunkPositionAsync(const FVector PlayerPosition, const FIntVector NewChunkPosition);
 
 	//Mesh
-	void GenerateMesh();
+	void AGenerateMesh();
 	void CreateQuad(FMask Mask, FIntVector AxisMask, int Width, int Height, FVector V1, FVector V2, FVector V3, FVector V4);
-	void ApplyMesh();
 	void ClearMeshData();
 
 	//Utils
-	//int GetBlockIndex(int X, int Y, int Z) const;
-	EBlock GetBlock(FIntVector Index, bool checkOutsideChunk);
 	FIntVector GetBlockChunkAndIndex(FIntVector& Index);
 	bool CompareMask(const FMask M1, const FMask M2) const;
 	TArray<FIntVector> CalculatePerspectiveMask(FVector PlayerPosition);

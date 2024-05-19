@@ -15,7 +15,7 @@ enum class EBlock : uint8
 UENUM(BlueprintType)
 enum class EGenerationLayer : uint8
 {
-	EmptyChunk, TerrainLayer, InterChunkLayer
+	TerrainLayer, InterChunkLayer, Complete
 };
 
 UENUM(BlueprintType)

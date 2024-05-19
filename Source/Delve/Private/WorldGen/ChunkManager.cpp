@@ -29,49 +29,77 @@ AChunkManager::~AChunkManager()
 
 void AChunkManager::UpdatePlayerChunkPosition(const FVector& PlayerPosition)
 {
-	//UpdatePlayerChunkPositionAsync(PlayerPosition);
+	UpdatePlayerChunkPositionAsync(PlayerPosition);
 }
 
 void AChunkManager::UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition)
 {
 	UE_LOG(LogTemp, Warning, TEXT("Updating..."));
+
 	bool UpdateDirection = false;
 	FIntVector NewPlayerChunkPosition = VectorFunctionUtils::FVectorToFIntVector(PlayerPosition);
-
 	FIntVector Direction = NewPlayerChunkPosition - PreviousPlayerChunkPosition;
+
 	if (Direction != FIntVector(0, 0, 0))
-	{		
+	{
 		TArray<FIntVector> AvailablePositions;
-		TArray<FChunkData*> AvailableChunks;
-		
-		for (int i = 0; i < ChunkObjects.Num(); i++)
+		TArray< TSharedPtr<FChunkData>> AvailableChunks;
+
+		for (auto& Elem : ChunkMap)
 		{
-			float OutChunkDistance = FIntVectorDistance(NewPlayerChunkPosition, ChunkObjects[i].Position);
-			float InChunkDistance = FIntVectorDistance(PreviousPlayerChunkPosition, ChunkObjects[i].Position + Direction);
+			TSharedPtr<FChunkData> ChunkData = Elem.Value;
+			float OutChunkDistance = FIntVectorDistance(NewPlayerChunkPosition, ChunkData->Position);
+			float InChunkDistance = FIntVectorDistance(PreviousPlayerChunkPosition, ChunkData->Position + Direction);
 
-			if (InChunkDistance > RenderDistance)// Get a list of new positions to fill with available chunks
+			if (InChunkDistance > RenderDistance)
 			{
-				AvailablePositions.Add(ChunkObjects[i].Position + Direction);// Could be a predifined list
+				AvailablePositions.Add(ChunkData->Position + Direction);
 			}
 
-			if (OutChunkDistance > RenderDistance)// If out of render distance make class available and remove from list
+			if (OutChunkDistance > RenderDistance)
 			{
-				AvailableChunks.Add(&ChunkObjects[i]);
+				AvailableChunks.Add(ChunkData);
+				ChunkGenerationLayersExpected[int(EGenerationLayer::TerrainLayer)]++;
 			}
-			else //if not update render distance
-				ChunkObjects[i].Chunk->StartAsyncChunkLodUpdate(RenderDistance, OutChunkDistance, PlayerPosition);
+			else// Update Lod
+			{
+				//Broken maybe but only a bit
+				// still not worth using due to CreateMeshSection bottleneck
+				//ChunkData->Chunk->StartAsyncChunkLodUpdate(RenderDistance, OutChunkDistance, PlayerPosition);
+			}
 		}
-		UE_LOG(LogTemp, Warning, TEXT("Positions: %d/n Chunks: %d"), AvailablePositions.Num(), AvailableChunks.Num());
+
+		UE_LOG(LogTemp, Warning, TEXT("Positions: %d\nChunks: %d"), AvailablePositions.Num(), AvailableChunks.Num());
 
 		int i = 0;
-		for (auto& chunk : AvailableChunks)// Match available positions and chunks and update.
+		for (auto& ChunkData : AvailableChunks)
 		{
-			chunk->Position = AvailablePositions[i++];
-			chunk->Chunk->StartAsyncChunkPositionUpdate(PlayerPosition, chunk->Position);
+			if (i < AvailablePositions.Num())
+			{
+				FIntVector OldPosition = ChunkData->Position;
+				FIntVector NewPosition = AvailablePositions[i++];
+
+				ChunkMap.Remove(OldPosition);
+				ChunkData->Position = NewPosition;
+				ChunkMap.Add(NewPosition, ChunkData);
+				//Reset Values
+				ChunkData->Blocks.Empty();
+				ChunkData->QueuedBlockUpdates.Empty();
+				ChunkData->GenerationLayer = EGenerationLayer::TerrainLayer;
+				ChunkData->NeighbourChunks.Empty();
+				ChunkData->HasSixNeighbours = false;
+			}
+		}
+		CheckAllChunksForNeighbours();
+		for (auto& ChunkData : AvailableChunks)
+		{
+			ChunkData->Chunk->StartAsyncChunkPositionUpdate(PlayerPosition, ChunkData->Position);
+
 		}
 	}
+
 	PreviousPlayerChunkPosition = NewPlayerChunkPosition;
-	
+
 	UE_LOG(LogTemp, Warning, TEXT("Update finished"));
 }
 
@@ -84,45 +112,58 @@ void AChunkManager::BeginPlay()
 
 void AChunkManager::GenerateChunks(FIntVector CentralRenderChunkVector)
 {
+	// Initialize render distance manager
 	ChunkRenderDistance crd(RenderDistance);
-	TArray<FChunkData> dataArray = crd.CalculateRenderSphere();
-	int NumberOfChunks = 0;
-	for (FChunkData& data : dataArray)
+	// Calculate render sphere
+	TArray<FChunkData> ChunksToSpawn = crd.CalculateRenderSphere();
+
+	// Spawn all chunks to be used for the rest of the game session
+	for (FChunkData& chunk : ChunksToSpawn)
 	{
-		SpawnChunk(data, CentralRenderChunkVector);
-		NumberOfChunks++;
+		SpawnChunk(chunk, CentralRenderChunkVector);
+		//chunk.Chunk->BeginGeneration();
+		TotalChunks++;
 	}
-	dataArray.Empty();
-	for (FChunkData& data : ChunkObjects)
-	{		
-		if (GetSixPointers(data))
+	ChunksToSpawn.Empty();
+	ChunkGenerationLayersExpected[int(EGenerationLayer::TerrainLayer)] = TotalChunks;
+	UE_LOG(LogTemp, Warning, TEXT("%d Chunks Spawned."), TotalChunks);
+
+	CheckAllChunksForNeighbours();
+}
+
+// Must be done after chunks are spawned, neighbour information used for later generation stages
+void AChunkManager::CheckAllChunksForNeighbours()
+{
+	for (auto& Elem : ChunkMap)
+	{
+		// Elem is of type TPair<FIntVector, FChunkData*>
+		TSharedPtr <FChunkData> ChunkData = Elem.Value;
+		if (!ChunkData->HasSixNeighbours && GetSixPointers(ChunkData))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Found all neighbours for Chunk %d.%d.%d"), data.Position.X, data.Position.Y, data.Position.Z);
-			data.Chunk->BeginPlay();
-		}		
+			ChunkGenerationLayersExpected[int(EGenerationLayer::InterChunkLayer)]++;
+		}
 	}
-	ChunkObjects.Sort();
-	TotalChunks = NumberOfChunks;
-	UE_LOG(LogTemp, Warning, TEXT("%d Chunks Spawned."), NumberOfChunks);
 }
 
 void AChunkManager::SpawnChunk(FChunkData data, FIntVector CentralRenderChunkVector)
 {
 	FIntVector position = (data.Position + CentralRenderChunkVector) * ChunkSize;
 	UChunkClass* chunk = NewObject<UChunkClass>();//TODO can move this assignments to the constructor
+	chunk->AddToRoot();
 	chunk->ChunkManager = this;
 	chunk->Frequency = MainFreqency;
 	chunk->Lod = data.Lod;
 	chunk->ChunkWorldPosition = FVector(position);
 
-	FChunkData* ChunkData = new FChunkData();
+	TSharedPtr<FChunkData> ChunkData = MakeShared<FChunkData>();
 	ChunkData->Lod = data.Lod;
 	ChunkData->Position = data.Position;
 	ChunkData->Chunk = chunk;
-	//ChunkData->Blocks.SetNum((ChunkSize) * (ChunkSize) * (ChunkSize));
 	chunk->ChunkData = ChunkData;
 
-	ChunkObjects.Add(*ChunkData);
+	ChunkMap.Add(ChunkData->Position, ChunkData);
+
+	chunk->BeginGeneration();
 }
 
 UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod)
@@ -208,38 +249,83 @@ void AChunkManager::EnqueueMeshUpdate(UProceduralMeshComponent* Mesh, FChunkMesh
 	Update.Vertexes = VertexCount;
 
 	MeshUpdateQueue.Enqueue(Update);
+	//UE_LOG(LogTemp, Warning, TEXT("mesh update queued"));
 }
 
 void AChunkManager::DistributeBulkChunkUpdates(TArray<FBlockUpdate> BlockUpdates)
 {
 	int n = 0;
-	for (int j = 0; j < ChunkObjects.Num(); j++)
+
+	for (int i = 0; i < BlockUpdates.Num(); i++)
 	{
-		for (int i = 0; i < BlockUpdates.Num(); i++)
+		// Try to find the chunk in ChunkMap using the TargetChunk position from BlockUpdates
+		TSharedPtr<FChunkData>* FoundChunkData = ChunkMap.Find(BlockUpdates[i].TargetChunk);
+		if (FoundChunkData != nullptr)
 		{
-			if (ChunkObjects[j].Position == BlockUpdates[i].TargetChunk)
-			{
-				ChunkObjects[j].QueuedBlockUpdates.Add(FBlockUpdate(BlockUpdates[i].TargetChunk, BlockUpdates[i].DispatchChunk, BlockUpdates[i].Position, BlockUpdates[i].Block));
-				//UE_LOG(LogTemp, Warning, TEXT("Enqueued %d.%d.%d"), BlockUpdates[i].Position.X, BlockUpdates[i].Position.Y, BlockUpdates[i].Position.Z);
-				n++;
-				//UE_LOG(LogTemp, Warning, TEXT("Enqueued %d"), ChunkObjects[j].QueuedBlockUpdates.Num());
-			}
+			// If found, add the block update to the chunk's QueuedBlockUpdates
+			(*FoundChunkData)->QueuedBlockUpdates.Add(FBlockUpdate(BlockUpdates[i].TargetChunk, BlockUpdates[i].DispatchChunk, BlockUpdates[i].Position, BlockUpdates[i].Block));
+			n++;
+		}
+		else
+		{
+			//what do about these ones
 		}
 	}
 }
 
-void AChunkManager::UpdateChunkGenerationLayerStatus()
+// Chunks send their current generation status here when it is complete to sync layers. All GenerationLayer changes go through here for continuity
+void AChunkManager::UpdateChunkGenerationLayerStatus(EGenerationLayer GenerationLayer)
 {
-	if (++ChunksCompletedLayerOneGenration == TotalChunks)
+	//UE_LOG(LogTemp, Warning, TEXT("Layer %d at %d"), int(GenerationLayer), ChunkGenerationLayersExpected[int(GenerationLayer)]);
+	//UE_LOG(LogTemp, Warning, TEXT("Called by chunk: %d.%d.%d"), int(GenerationLayer), ChunkGenerationLayersExpected[int(GenerationLayer)]);
+	if (--ChunkGenerationLayersExpected[int(GenerationLayer)] == 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Layer 1 complete"));
-		for (int j = 0; j < ChunkObjects.Num(); j++)
+		//start thread here
+		UE_LOG(LogTemp, Warning, TEXT("Layer %d complete"), GenerationLayer);
+		for (auto& Elem : ChunkMap)
 		{
+			
+			// Elem is of type TPair<FIntVector, FChunkData*>
+			TSharedPtr<FChunkData> ChunkData = Elem.Value;
 			//UE_LOG(LogTemp, Warning, TEXT("que %d"), ChunkObjects[j].QueuedBlockUpdates.Num());
-			ChunkObjects[j].Chunk->ModifyVoxels(ChunkObjects[j].QueuedBlockUpdates, true);
-			ChunkObjects[j].QueuedBlockUpdates.Empty();
+			//UE_LOG(LogTemp, Warning, TEXT("num negihbs in Up %d %d"), ChunkData->NeighbourChunks.Num(), ChunkData->HasSixNeighbours);
+
+			switch (GenerationLayer)
+			{
+				case EGenerationLayer::TerrainLayer:
+				{
+				// In this step the chunk has generated the terrain and queued all decoration changes in other chunks
+				// We sync this so that all the decorations are queued before we start applying any.
+				// Only chunks with six Neigbours are eligible for this stage as they have received all possible decorations
+					
+					if (ChunkData->HasSixNeighbours && ChunkData->GenerationLayer == EGenerationLayer::TerrainLayer)
+					{
+						ChunkData->GenerationLayer = EGenerationLayer::InterChunkLayer;
+						ChunkData->Chunk->ModifyVoxelsInterChunkLayer(ChunkData->QueuedBlockUpdates);
+						ChunkData->QueuedBlockUpdates.Empty();
+					}
+					else if (ChunkData->GenerationLayer == EGenerationLayer::TerrainLayer)
+					{
+						ChunkData->Chunk->ClearMesh();
+					}
+					break;
+				}
+				// This layer is complete when all chunks have ran updates from the other chunks
+				// Here we can initialize final mesh generation of those chunks
+				case EGenerationLayer::InterChunkLayer:
+				{
+					if (ChunkData->HasSixNeighbours && ChunkData->GenerationLayer == EGenerationLayer::InterChunkLayer)
+					{
+						ChunkData->Chunk->ApplyMesh();
+						ChunkData->GenerationLayer = EGenerationLayer::Complete;
+					}
+					break;
+				}
+			}
 		}
-	}	
+		// Layer expected count should be 0 at this point
+	}
+		
 	//UE_LOG(LogTemp, Warning, TEXT("ChunksCompletedLayerOneGenration: %d"), ChunksCompletedLayerOneGenration);
 	//UE_LOG(LogTemp, Warning, TEXT("Total Chunks: %d"), TotalChunks);
 }
@@ -249,10 +335,10 @@ EBlock AChunkManager::GetBlockFromChunk(const FIntVector& BlockIndex, const FInt
 	return EBlock::Null;
 }
 
-bool AChunkManager::GetSixPointers(FChunkData& Chunk)
+bool AChunkManager::GetSixPointers(TSharedPtr<FChunkData> ChunkData)
 {
 	//UE_LOG(LogTemp, Warning, TEXT("-----------"));
-	//UE_LOG(LogTemp, Warning, TEXT("Searching Chunk %d.%d.%d"), Chunk.Position.X, Chunk.Position.Y, Chunk.Position.Z);
+	//UE_LOG(LogTemp, Warning, TEXT("Searching Chunk %d.%d.%d"));
 	for (int i = 0; i < 3; i++)
 	{
 		for (int j = -1; j < 2; j += 2)
@@ -260,23 +346,23 @@ bool AChunkManager::GetSixPointers(FChunkData& Chunk)
 			//UE_LOG(LogTemp, Warning, TEXT("j %d"), j);
 			FIntVector Direction = FIntVector::ZeroValue;
 			Direction[i] += j;
-			FChunkData* Neighbour = ChunkObjects.FindByPredicate([&](const FChunkData& ChunkData) {
-				//UE_LOG(LogTemp, Warning, TEXT("ChunkData %d.%d.%d"), ChunkData.Position.X, ChunkData.Position.Y, ChunkData.Position.Z);
-				//UE_LOG(LogTemp, Warning, TEXT("Direction %d.%d.%d"), Chunk.Position.X + Direction.X, Chunk.Position.Y + Direction.Y, Chunk.Position.Z + Direction.Z);
-				return ChunkData.Position == Chunk.Position + Direction;
-				});
+			FIntVector TargetPosition = ChunkData->Position + Direction;
+
+			TSharedPtr<FChunkData>* NeighbourPtr = ChunkMap.Find(TargetPosition);
+			TSharedPtr<FChunkData> Neighbour = NeighbourPtr ? *NeighbourPtr : nullptr;
 			if (Neighbour)
 			{
 				//UE_LOG(LogTemp, Warning, TEXT("gp"));
-				Chunk.NeighbourChunks.Add(Neighbour);
+				ChunkData->NeighbourChunks.Add(Neighbour);
 			}
 			else
 			{
-				Chunk.NeighbourChunks.Empty();
+				ChunkData->NeighbourChunks.Empty();
 				return false;
 			}
 		}
 	}
+	ChunkData->HasSixNeighbours = true;
 	return true;
 }
 

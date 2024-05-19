@@ -55,28 +55,31 @@ public:
 	void EnqueueMeshUpdate(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector ChunkWorldPosition, int Lod, int VertexCount);
 
 	void DistributeBulkChunkUpdates(TArray<FBlockUpdate> BlockUpdates);
-	void UpdateChunkGenerationLayerStatus();
+	void UpdateChunkGenerationLayerStatus(EGenerationLayer GenerationLayer);
 	EBlock GetBlockFromChunk(const FIntVector& BlockIndex, const FIntVector& ChunkIndex);
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 	void GenerateChunks(FIntVector CenterPoint);
+	void CheckAllChunksForNeighbours();
 	void SpawnChunk(FChunkData dataArray, FIntVector CentralRenderChunkVector);
 
 private:
 	int TotalChunks;
-	int ChunksCompletedLayerOneGenration; //use array when more layers are nescessary.
+	int ChunkGenerationLayersExpected[3]; //use array when more layers are nescessary.
 
 	void UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition);
 
-	UPROPERTY()
-	TArray<FChunkData> ChunkObjects;
+	//UPROPERTY()
+	// Using TMap to store chunk data
+	TMap<FIntVector, TSharedPtr<FChunkData>> ChunkMap;
+
 	UPROPERTY()
 	FIntVector LastUpdateDirection;
 
 	FGraphEventArray UpdateTasksList;
-	bool GetSixPointers(FChunkData& Chunk);
+	bool GetSixPointers(TSharedPtr<FChunkData> Chunk);
 
 	TQueue<FQueuedMeshUpdate> MeshUpdateQueue;
 	//UProceduralMeshComponent* Mesh;

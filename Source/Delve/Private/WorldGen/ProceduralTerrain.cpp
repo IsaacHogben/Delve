@@ -70,8 +70,9 @@ TArray<FBlockUpdate> ProceduralTerrain::GetGeneratedChunk(FVector ChunkPosition,
 		}
 	}
 
-	AddReferencelessDecorations(BlockArray, Noise, BlockUpdates);
-	//MakeTestShape(BlockUpdates, 0,0,0);
+	//AddReferencelessDecorations(BlockArray, Noise, BlockUpdates);
+	//MakeTestShape(BlockUpdates, -1,-1,-1);
+	MakeTestShape(BlockUpdates, 0,0,0);
 	UpdateDispatchInfoForBlockUpdates(BlockUpdates, ChunkVectorPosition);
 	return BlockUpdates;
 }
@@ -105,8 +106,12 @@ void ProceduralTerrain::AddReferencelessDecorations(TArray<EBlock>& BlockArray, 
 				if (Block == EBlock::Grass && BlockArray[GetBlockIndex(x, y, z + 1)] == EBlock::Air)
 				{
 					if (FMath::RandRange(0, 124) == 0)
+					{
+						MakeTestShape(BlockUpdates, x + 1, y, z + 1);
+						MakeTestShape(BlockUpdates, x + 1, y + 1, z + 1);
+						MakeTestShape(BlockUpdates, x, y+ 1, z + 1);
 						MakeTestShape(BlockUpdates, x, y, z + 1);
-					UE_LOG(LogTemp, Warning, TEXT("Made Tree"));
+					}
 				}
 			}
 		}
@@ -125,22 +130,20 @@ void ProceduralTerrain::UpdateDispatchInfoForBlockUpdates(TArray<FBlockUpdate>& 
 void ProceduralTerrain::MakeTestShape(TArray<FBlockUpdate>& BlockUpdates, int x, int y, int z)
 {
 	//BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y, z), EBlock::Stone));
-	int r = FMath::RandRange(7, 25);
-	for (int i = 0; i < r; i++)
+	//int r = 44;
+	for (int i = 1; i < 64; i++)
 	{ 	
-		if (i == (r - 1))
-		{
-			BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y, z + i), EBlock::Grass));
-			BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x + 1, y, z + i - 1), EBlock::Grass));
-			BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x - 1, y, z + i - 1), EBlock::Grass));
-			BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y + 1, z + i - 1), EBlock::Grass));
-			BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y - 1, z + i - 1), EBlock::Grass));
-			BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x + 2, y, z + i - 2), EBlock::Grass));
-			BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x - 2, y, z + i - 2), EBlock::Grass));
-			BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y + 2, z + i - 2), EBlock::Grass));
-			BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y - 2, z + i - 2), EBlock::Grass));
-		}
-		else
-			BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y, z + i), EBlock::Dirt));
+		BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x + i, y, z), EBlock::Stone));
+		BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y + i, z), EBlock::Stone));
+		BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y, z + i), EBlock::Stone));
+	}
+	x = 63;
+	y = 63;
+	z = 63;
+	for (int i = 1; i < 64; i++)
+	{
+		BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x - i, y, z), EBlock::Stone));
+		BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y - i, z), EBlock::Stone));
+		BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y, z - i), EBlock::Stone));
 	}
 }
