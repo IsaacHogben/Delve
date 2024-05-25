@@ -51,9 +51,9 @@ EBlock ProceduralTerrain::GetTerrainBlock(float x, float y, float z, FastNoiseLi
 }
 
 //Generates first layer terrain and returns FBulkBlockUpdate for additional levels of modification.
-TArray<FBlockUpdate> ProceduralTerrain::GetGeneratedChunk(FVector ChunkPosition, FIntVector ChunkVectorPosition, int ChunkSize, TArray<EBlock>& BlockArray, FastNoiseLite* Noise, bool& IsChunkEmpty)
+TArray<FCachedBlockUpdate> ProceduralTerrain::GetGeneratedChunk(FVector ChunkPosition, FIntVector ChunkVectorPosition, int ChunkSize, TArray<EBlock>& BlockArray, FastNoiseLite* Noise, bool& IsChunkEmpty)
 {
-	TArray<FBlockUpdate> BlockUpdates;
+	TArray<FCachedBlockUpdate> BlockUpdates;
 	IsChunkEmpty = false; //WILL NEVER TRIGER! TODO
 	EBlock Block;
 	for (int x = 0; x < ChunkSize; ++x)
@@ -66,6 +66,11 @@ TArray<FBlockUpdate> ProceduralTerrain::GetGeneratedChunk(FVector ChunkPosition,
 				BlockArray[GetBlockIndex(x, y, z)] = Block;
 				if (Block != EBlock::Air)
 					IsChunkEmpty = false;
+				if (Block == EBlock::Grass)
+				{
+					if (FMath::RandRange(0, 124) == 0)
+						MakeTestTree(BlockUpdates, 15, x, y, z);
+				}
 			}
 		}
 	}
@@ -73,7 +78,6 @@ TArray<FBlockUpdate> ProceduralTerrain::GetGeneratedChunk(FVector ChunkPosition,
 	//AddReferencelessDecorations(BlockArray, Noise, BlockUpdates);
 	//MakeTestShape(BlockUpdates, -1,-1,-1);
 	MakeTestShape(BlockUpdates, 0,0,0);
-	UpdateDispatchInfoForBlockUpdates(BlockUpdates, ChunkVectorPosition);
 	return BlockUpdates;
 }
 
@@ -91,7 +95,7 @@ bool ProceduralTerrain::IsAir(float Value, float Density)
 	return false;
 }
 
-void ProceduralTerrain::AddReferencelessDecorations(TArray<EBlock>& BlockArray, FastNoiseLite* Noise, TArray<FBlockUpdate>& BlockUpdates)
+void ProceduralTerrain::AddReferencelessDecorations(TArray<EBlock>& BlockArray, FastNoiseLite* Noise, TArray<FCachedBlockUpdate>& BlockUpdates)
 {
 	int ChunkSize = 64;
 	EBlock Block;
@@ -118,32 +122,68 @@ void ProceduralTerrain::AddReferencelessDecorations(TArray<EBlock>& BlockArray, 
 	}
 }
 
-void ProceduralTerrain::UpdateDispatchInfoForBlockUpdates(TArray<FBlockUpdate>& BlockUpdates, FIntVector ChunkVectorPosition)
-{
-	for (int i = 0; i < BlockUpdates.Num(); i++)
-	{
-		BlockUpdates[i].DispatchChunk = ChunkVectorPosition;
-		BlockUpdates[i].TargetChunk = ChunkVectorPosition;
-	}
-}
-
-void ProceduralTerrain::MakeTestShape(TArray<FBlockUpdate>& BlockUpdates, int x, int y, int z)
+void ProceduralTerrain::MakeTestShape(TArray<FCachedBlockUpdate>& BlockUpdates, int x, int y, int z)
 {
 	//BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y, z), EBlock::Stone));
 	//int r = 44;
 	for (int i = 1; i < 64; i++)
 	{ 	
-		BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x + i, y, z), EBlock::Stone));
-		BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y + i, z), EBlock::Stone));
-		BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y, z + i), EBlock::Stone));
+		BlockUpdates.Add(FCachedBlockUpdate(FIntVector(x + i, y, z), EBlock::Stone));
+		BlockUpdates.Add(FCachedBlockUpdate(FIntVector(x, y + i, z), EBlock::Stone));
+		BlockUpdates.Add(FCachedBlockUpdate(FIntVector(x, y, z + i), EBlock::Stone));
 	}
 	x = 63;
 	y = 63;
 	z = 63;
 	for (int i = 1; i < 64; i++)
 	{
-		BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x - i, y, z), EBlock::Stone));
-		BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y - i, z), EBlock::Stone));
-		BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y, z - i), EBlock::Stone));
+		BlockUpdates.Add(FCachedBlockUpdate(FIntVector(x - i, y, z), EBlock::Stone));
+		BlockUpdates.Add(FCachedBlockUpdate(FIntVector(x, y - i, z), EBlock::Stone));
+		BlockUpdates.Add(FCachedBlockUpdate(FIntVector(x, y, z - i), EBlock::Stone));
+	}
+}
+
+void ProceduralTerrain::MakeTestTree(TArray<FCachedBlockUpdate>& BlockUpdates, int height, int x, int y, int z)
+{
+	//BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y, z), EBlock::Stone));
+	//int r = 44;
+	for (int i = 1; i < height; i++)
+	{
+		BlockUpdates.Add(FCachedBlockUpdate(FIntVector(x, y, z + i), EBlock::Dirt));
+	}
+	AddSphere(BlockUpdates, 3, x, y, z + height, EBlock::Grass);
+}
+
+void ProceduralTerrain::AddCylinder(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int height, int centerX, int centerY, int baseZ, EBlock blockType)
+{
+	for (int z = 0; z < height; ++z)
+	{
+		for (int x = -radius; x <= radius; ++x)
+		{
+			for (int y = -radius; y <= radius; ++y)
+			{
+				if (x * x + y * y <= radius * radius)
+				{
+					BlockUpdates.Add(FCachedBlockUpdate( FIntVector(centerX + x, centerY + y, baseZ + z), blockType));
+				}
+			}
+		}
+	}
+}
+
+void ProceduralTerrain::AddSphere(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int centerX, int centerY, int centerZ, EBlock blockType)
+{
+	for (int x = -radius; x <= radius; ++x)
+	{
+		for (int y = -radius; y <= radius; ++y)
+		{
+			for (int z = -radius; z <= radius; ++z)
+			{
+				if (x * x + y * y + z * z <= radius * radius)
+				{
+					BlockUpdates.Add(FCachedBlockUpdate(FIntVector(centerX + x, centerY + y, centerZ + z), blockType));
+				}
+			}
+		}
 	}
 }

@@ -13,9 +13,19 @@ enum class EBlock : uint8
 };
 
 UENUM(BlueprintType)
-enum class EGenerationLayer : uint8
+enum class ECompletedGenerationLayer : uint8
 {
-	TerrainLayer, InterChunkLayer, Complete
+	Empty,
+	//Terrain and local decorations generated in this layer. Any decorations that fall outside chunk bounds are distributed.
+	InitialTerrainLayer,
+	//Terrain generation complete, this layer is eligible to be decorated
+	HasNeigboursLayer,
+	//Decorations received from other chunks are processed in this layer.
+	DecorationLayer,
+	//Set to Complete once chunk is fully generated and Mesh is added to world.
+	Complete,
+	//Used by completed chunks that are chached or saved
+	CompleteInActive
 };
 
 UENUM(BlueprintType)

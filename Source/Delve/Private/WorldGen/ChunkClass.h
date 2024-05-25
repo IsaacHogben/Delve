@@ -22,6 +22,7 @@ class UProceduralMeshComponent;
 class AChunkManager; // Forward declaration of AChunkManager
 
 struct FBlockUpdate;
+struct FCachedBlockUpdate;
 struct FChunkData;
 
 USTRUCT()
@@ -78,14 +79,14 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Chunk")
 	FIntVector ModifyVoxel(FIntVector& Position, const EBlock& Block, bool RegenerateMesh);
-	void ModifyVoxels(TArray<FBlockUpdate>& BlockUpdates, bool RegenerateMesh);
-	void ModifyVoxelsInterChunkLayer(TArray<FBlockUpdate>& BlockUpdates);
+	void ModifyVoxels(TArray<FCachedBlockUpdate>& BlockUpdates, bool RegenerateMesh);
+	void ModifyVoxelsInterChunkLayer(TArray<FCachedBlockUpdate>& BlockUpdates);
 	void ApplyMesh();
 	void ClearMesh();
 	EBlock GetBlock(FIntVector Index, bool checkOutsideChunk);
 
 	void StartAsyncChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition);
-	void StartAsyncChunkPositionUpdate(const FVector PlayerPosition, const FIntVector NewChunkPosition);
+	void StartAsyncChunkPositionUpdate();
 
 protected:
 	
@@ -107,7 +108,7 @@ private:
 	
 	bool IsChunkEmpty = true;
 
-	void GenerateChunkAsync(const FVector& PlayerPosition);
+	void GenerateChunkAsync();
 	void GenerateChunkAsyncComplete();
 
 	void UpdateChunkLodAsync(int RenderDistance, const float Distance, const FVector PlayerPosition);
@@ -115,7 +116,7 @@ private:
 	void UpdatePerspectiveMask(const FVector& PlayerPosition, bool& ContinueToUpdate);
 	void UpdateChunkAsyncComplete();
 
-	void UpdateChunkPositionAsync(const FVector PlayerPosition, const FIntVector NewChunkPosition);
+	void UpdateChunkPositionAsync();
 
 	//Mesh
 	void AGenerateMesh();

@@ -17,6 +17,7 @@
 class UChunkClass;
 struct FChunkData;
 struct FBlockUpdate;
+struct FCachedBlockUpdate;
 struct FQueuedMeshUpdate;
 
 UCLASS()
@@ -55,14 +56,15 @@ public:
 	void EnqueueMeshUpdate(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector ChunkWorldPosition, int Lod, int VertexCount);
 
 	void DistributeBulkChunkUpdates(TArray<FBlockUpdate> BlockUpdates);
-	void UpdateChunkGenerationLayerStatus(EGenerationLayer GenerationLayer);
+	void UpdateChunkGenerationLayerStatus();
+	void StartDecorationApplication(TSharedPtr<FChunkData> ChunkData);
 	EBlock GetBlockFromChunk(const FIntVector& BlockIndex, const FIntVector& ChunkIndex);
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 	void GenerateChunks(FIntVector CenterPoint);
-	void CheckAllChunksForNeighbours();
+	bool CheckChunkForNeighbours(TSharedPtr<FChunkData> ChunkData);
 	void SpawnChunk(FChunkData dataArray, FIntVector CentralRenderChunkVector);
 
 private:
@@ -70,10 +72,12 @@ private:
 	int ChunkGenerationLayersExpected[3]; //use array when more layers are nescessary.
 
 	void UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition);
-
+	void StartChunkGeneration();
 	//UPROPERTY()
 	// Using TMap to store chunk data
-	TMap<FIntVector, TSharedPtr<FChunkData>> ChunkMap;
+	TMap<FIntVector, TSharedPtr<FChunkData>> ActiveChunkMap;
+	TMap<FIntVector, TSharedPtr<FChunkData>> InActiveChunkMap;
+	TMap<FIntVector, TArray<FCachedBlockUpdate>> CachedChunkUpdateMap;
 
 	UPROPERTY()
 	FIntVector LastUpdateDirection;

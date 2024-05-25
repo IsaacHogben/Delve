@@ -17,16 +17,16 @@ UChunkClass::~UChunkClass()
 
 void UChunkClass::BeginGeneration()
 {
-	StartAsyncChunkGen(FVector::Zero());
+	Setup();
+	GenerateProceduralTerrain();
 }
 
 // Setup of the chunk class. Only done once
 void UChunkClass::Setup()
 {
-	
 	MeshData = new FChunkMeshData();
 
-	Noise = new FastNoiseLite(33253);
+	Noise = new FastNoiseLite(999);
 	Noise->SetFrequency(Frequency);
 	Noise->SetNoiseType(FastNoiseLite::NoiseType_Perlin);
 	Noise->SetFractalType(FastNoiseLite::FractalType_FBm);
@@ -44,7 +44,7 @@ void UChunkClass::Setup()
 void UChunkClass::StartAsyncChunkGen(const FVector& PlayerPosition)
 {
 	FGraphEventRef FirstTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, PlayerPosition]() {
-		GenerateChunkAsync(PlayerPosition);
+		GenerateChunkAsync();
 		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
 
 	FGraphEventRef SecondTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
@@ -53,15 +53,14 @@ void UChunkClass::StartAsyncChunkGen(const FVector& PlayerPosition)
 
 }
 
-void UChunkClass::GenerateChunkAsync(const FVector& PlayerPosition)
+void UChunkClass::GenerateChunkAsync()
 {
-	Setup();
-	GenerateProceduralTerrain();
+	
 }
 
 void UChunkClass::GenerateChunkAsyncComplete()
 {
-	ChunkManager->UpdateChunkGenerationLayerStatus(ChunkData->GenerationLayer);
+	//ChunkManager->UpdateChunkGenerationLayerStatus(ChunkData->GenerationLayer);
 	//Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
 }
 
@@ -72,13 +71,21 @@ void UChunkClass::StartAsyncChunkLodUpdate(int RenderDistance, const float Dista
 		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
 }
 
-void UChunkClass::StartAsyncChunkPositionUpdate(const FVector PlayerPosition, const FIntVector NewChunkPosition)
+void UChunkClass::StartAsyncChunkPositionUpdate()
 {
-	//PreviousPosUpdateTask = nullptr;
+	bool ContinueToUpdate = true;
+	if (!ChunkData.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("ChunkData is invalid!"));
+	}
 
-	FGraphEventRef NewUpdateTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, PlayerPosition, NewChunkPosition]() {
+	//Update Position
+	ChunkWorldPosition = FVector(ChunkData->Position) * ChunkSize;
+
+	//UpdateChunkPositionAsync();
+	/*FGraphEventRef NewUpdateTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, PlayerPosition, NewChunkPosition]() {
 		UpdateChunkPositionAsync(PlayerPosition, NewChunkPosition);
-		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundHiPriTask);
+		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundHiPriTask);*/
 
 }
 
@@ -134,31 +141,17 @@ void UChunkClass::UpdatePerspectiveMask(const FVector& PlayerPosition, bool& Con
 	}
 }
 
-void UChunkClass::UpdateChunkPositionAsync(const FVector PlayerPosition, const FIntVector NewChunkPosition)
+void UChunkClass::UpdateChunkPositionAsync()
 {
-	bool ContinueToUpdate = true;
-	if (!ChunkData.IsValid())
-	{
-		UE_LOG(LogTemp, Error, TEXT("ChunkData is invalid!"));
-	}
+	//bool ContinueToUpdate = true;
+	//if (!ChunkData.IsValid())
+	//{
+	//	UE_LOG(LogTemp, Error, TEXT("ChunkData is invalid!"));
+	//}
 
-	//Update Position
-	ChunkData->Position = NewChunkPosition;
-	ChunkWorldPosition = FVector(ChunkData->Position) * ChunkSize;
+	////Update Position
+	//ChunkWorldPosition = FVector(ChunkData->Position) * ChunkSize;
 
-
-	//Get Blocks for new position
-	GenerateProceduralTerrain();
-	/*ClearMeshData();
-	if (!IsChunkEmpty)
-	{
-		UpdatePerspectiveMask(PlayerPosition, ContinueToUpdate);
-		AGenerateMesh();
-	}*/
-
-	FGraphEventRef CompletionCallback = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
-		GenerateChunkAsyncComplete();
-		}, TStatId(), nullptr, ENamedThreads::GameThread);
 }
 
 void UChunkClass::UpdateChunkAsyncComplete()
@@ -398,10 +391,16 @@ void UChunkClass::ApplyMesh()
 {
 	ClearMeshData();
 	AGenerateMesh();
-	if (Mesh)
-		ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
-	else
-		Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
+	//Return to game thread
+	AsyncTask(ENamedThreads::GameThread, [this]()
+		{	
+		if (Mesh)
+		{
+			ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
+		}
+		else
+			Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
+		});
 }
 
 void UChunkClass::ClearMeshData()
@@ -415,18 +414,20 @@ void UChunkClass::ClearMesh()
 	if (Mesh)
 	{
 		ClearMeshData();
-		ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
+		AsyncTask(ENamedThreads::GameThread, [this]()
+			{
+				ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
+			});
+		
 	}
 }
 
 void UChunkClass::GenerateProceduralTerrain()
 {
 	ChunkData->Blocks.SetNum((ChunkSize) * (ChunkSize) * (ChunkSize));
-	TArray<FBlockUpdate> DecoBlockUpdates = ProceduralTerrain::GetGeneratedChunk(ChunkWorldPosition, ChunkData->Position, ChunkSize, ChunkData->Blocks, Noise, IsChunkEmpty);
+	TArray<FCachedBlockUpdate> DecoBlockUpdates = ProceduralTerrain::GetGeneratedChunk(ChunkWorldPosition, ChunkData->Position, ChunkSize, ChunkData->Blocks, Noise, IsChunkEmpty);
 
 	ModifyVoxels(DecoBlockUpdates, false);
-
-	//ChunkData->GenerationLayer = EGenerationLayer::TerrainLayer;
 }
 
 EBlock UChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
@@ -439,7 +440,6 @@ EBlock UChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
 		if (TargetChunk != ChunkData->Position)
 		{
 			//find neighbour by index TODO
-
 			for (const auto& Neighbour : ChunkData->NeighbourChunks)
 			{
 				if (Neighbour->Position == TargetChunk)
@@ -448,7 +448,7 @@ EBlock UChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
 					return Neighbour->Chunk->GetBlock(Index, false);
 				}
 			}
-			UE_LOG(LogTemp, Warning, TEXT("Block Not found in neighbour chunk!"));
+			UE_LOG(LogTemp, Warning, TEXT("Block Not found. Layer %d. Num Neighbours %d"), ChunkData->GenerationLayer, ChunkData->NeighbourChunks.Num());
 		}
 	}
 	// Else returns request from within the array
@@ -516,9 +516,9 @@ FIntVector UChunkClass::ModifyVoxel(FIntVector& Position, const EBlock& Block, b
 }
 
 // Also handles the redirects so all changes go through here. BlockUpdates should be deleted after being sent here.
-void UChunkClass::ModifyVoxels(TArray<FBlockUpdate>& BlockUpdates, bool RegenerateMesh)
+void UChunkClass::ModifyVoxels(TArray<FCachedBlockUpdate>& BlockUpdates, bool RegenerateMesh)
 {
-	//UE_LOG(LogTemp, Warning, TEXT("num negihbs in CC %d %d"), ChunkData->NeighbourChunks.Num(), ChunkData->HasSixNeighbours);
+	//UE_LOG(LogTemp, Warning, TEXT("num negihbs in CC %d %d"), ChunkData->NeighbourChunks.Num(), ChunkData->HasDistributedDecorations);
 
 	TArray<FBlockUpdate> RedirectBlockUpdates;
 	FIntVector RedirectChunk;
@@ -527,7 +527,7 @@ void UChunkClass::ModifyVoxels(TArray<FBlockUpdate>& BlockUpdates, bool Regenera
 		RedirectChunk = ModifyVoxel(BlockUpdates[i].Position, BlockUpdates[i].Block, false);
 		if (RedirectChunk != ChunkData->Position)
 		{
-			RedirectBlockUpdates.Add(FBlockUpdate(RedirectChunk, ChunkData->Position, BlockUpdates[i].Position, BlockUpdates[i].Block));
+			RedirectBlockUpdates.Add(FBlockUpdate(RedirectChunk, BlockUpdates[i].Position, BlockUpdates[i].Block));
 		}
 	}
 	ChunkManager->DistributeBulkChunkUpdates(RedirectBlockUpdates);
@@ -539,11 +539,11 @@ void UChunkClass::ModifyVoxels(TArray<FBlockUpdate>& BlockUpdates, bool Regenera
 	}
 }
 
-void UChunkClass::ModifyVoxelsInterChunkLayer(TArray<FBlockUpdate>& BlockUpdates)
+void UChunkClass::ModifyVoxelsInterChunkLayer(TArray<FCachedBlockUpdate>& BlockUpdates)
 {
 	ModifyVoxels(BlockUpdates, false);
 	//UE_LOG(LogTemp, Warning, TEXT("Chunk layer update from %d.%d.%d"), ChunkData->Position.X, ChunkData->Position.Y, ChunkData->Position.Z);
-	ChunkManager->UpdateChunkGenerationLayerStatus(ChunkData->GenerationLayer);
+
 }
 
 void UChunkClass::TaskGraphDebugLog()

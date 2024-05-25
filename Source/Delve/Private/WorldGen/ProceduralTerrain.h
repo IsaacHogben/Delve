@@ -7,7 +7,7 @@
 #include "../Utils/FastNoiseLite.h"
 #include "../Utils/ChunkStructs.h"
 
-struct FBlockUpdate;
+struct FCachedBlockUpdate;
 /**
  * 
  */
@@ -22,14 +22,16 @@ public:
 	static int GetBlockIndex(int X, int Y, int Z);
 
 	static EBlock GetTerrainBlock(float x, float y, float z, FastNoiseLite* Noise);
-	static TArray<FBlockUpdate> GetGeneratedChunk(FVector ChunkPosition, FIntVector ChunkVectorPosition, int ChunkSize, TArray<EBlock>& BlockArray, FastNoiseLite* Noise, bool& isChunkEmpty);
+	static TArray<FCachedBlockUpdate> GetGeneratedChunk(FVector ChunkPosition, FIntVector ChunkVectorPosition, int ChunkSize, TArray<EBlock>& BlockArray, FastNoiseLite* Noise, bool& isChunkEmpty);
 	
 private:
 	bool IsSurfaceBlock(float AboveValue, float Density);
 	bool IsAir(float Value, float Density);
 
-	static void AddReferencelessDecorations(TArray<EBlock>& BlockArray, FastNoiseLite* Noise, TArray<FBlockUpdate>&
+	static void AddReferencelessDecorations(TArray<EBlock>& BlockArray, FastNoiseLite* Noise, TArray<FCachedBlockUpdate>&
 		BlockUpdates);
-	static void UpdateDispatchInfoForBlockUpdates(TArray<FBlockUpdate>& BlockUpdates, FIntVector ChunkVectorPosition);
-	static void MakeTestShape(TArray<FBlockUpdate>& BlockUpdates, int x, int y, int z);
+	static void MakeTestShape(TArray<FCachedBlockUpdate>& BlockUpdates, int x, int y, int z);
+	static void MakeTestTree(TArray<FCachedBlockUpdate>& BlockUpdates, int height, int x, int y, int z);
+	void AddCylinder(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int height, int centerX, int centerY, int baseZ, EBlock blockType);
+	static void AddSphere(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int centerX, int centerY, int centerZ, EBlock blockType);
 };

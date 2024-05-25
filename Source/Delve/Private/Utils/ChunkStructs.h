@@ -14,18 +14,33 @@ struct FBlockUpdate
 
 public:
 	FIntVector TargetChunk;
-	FIntVector DispatchChunk;
 	FIntVector Position;
 	EBlock Block;
 
 	// Constructor with all parameters
 	FBlockUpdate(const FIntVector& InTargetChunk = FIntVector::ZeroValue,
-		const FIntVector& InDispatchChunk = FIntVector::ZeroValue,
 		const FIntVector& InPosition = FIntVector::ZeroValue,
 		EBlock InBlock = EBlock::Null)
 		: TargetChunk(InTargetChunk),
-		DispatchChunk(InDispatchChunk),
 		Position(InPosition),
+		Block(InBlock)
+	{
+	}
+};
+
+USTRUCT()
+struct FCachedBlockUpdate
+{
+	GENERATED_BODY();
+
+public:
+	FIntVector Position;
+	EBlock Block;
+
+	// Constructor with all parameters
+	FCachedBlockUpdate(const FIntVector& InPosition = FIntVector::ZeroValue,
+		EBlock InBlock = EBlock::Null)
+		: Position(InPosition),
 		Block(InBlock)
 	{
 	}
@@ -37,26 +52,28 @@ struct FChunkData
 	GENERATED_BODY();
 
 public:
+	bool IsActive;
 	int Lod;
 	UPROPERTY()
 	FIntVector Position;
 	UPROPERTY()
 	TObjectPtr<UChunkClass> Chunk;
 	UPROPERTY()
-	TArray<FBlockUpdate> QueuedBlockUpdates;
+	TArray<FCachedBlockUpdate> QueuedBlockUpdates;
 	UPROPERTY()
 	TArray<EBlock> Blocks;
 	TArray<TSharedPtr<FChunkData>> NeighbourChunks;
-	bool HasSixNeighbours = false;
-	EGenerationLayer GenerationLayer = EGenerationLayer::TerrainLayer;
+	bool HasDistributedDecorations = false;
+	ECompletedGenerationLayer GenerationLayer = ECompletedGenerationLayer::Empty;
 
 	// Default constructor
 	FChunkData()
-		: Lod(1)
+		: IsActive(true)
+		, Lod(1)
 		, Position(FIntVector::ZeroValue)
 		, Chunk(nullptr)
-		, HasSixNeighbours(false)
-		, GenerationLayer(EGenerationLayer::TerrainLayer)
+		, HasDistributedDecorations(false)
+		, GenerationLayer(ECompletedGenerationLayer::Empty)
 	{
 	}
 	~FChunkData()
@@ -96,3 +113,4 @@ public:
 	int Lod;
 	int Vertexes;
 };
+
