@@ -68,7 +68,7 @@ TArray<FCachedBlockUpdate> ProceduralTerrain::GetGeneratedChunk(FVector ChunkPos
 					IsChunkEmpty = false;
 				if (Block == EBlock::Grass)
 				{
-					if (FMath::RandRange(0, 124) == 0)
+					if (FMath::RandRange(0, 256) == 0)
 						MakeTestTree(BlockUpdates, 15, x, y, z);
 				}
 			}
@@ -77,7 +77,7 @@ TArray<FCachedBlockUpdate> ProceduralTerrain::GetGeneratedChunk(FVector ChunkPos
 
 	//AddReferencelessDecorations(BlockArray, Noise, BlockUpdates);
 	//MakeTestShape(BlockUpdates, -1,-1,-1);
-	MakeTestShape(BlockUpdates, 0,0,0);
+	//MakeTestShape(BlockUpdates, 0,0,0);
 	return BlockUpdates;
 }
 
@@ -151,7 +151,7 @@ void ProceduralTerrain::MakeTestTree(TArray<FCachedBlockUpdate>& BlockUpdates, i
 	{
 		BlockUpdates.Add(FCachedBlockUpdate(FIntVector(x, y, z + i), EBlock::Dirt));
 	}
-	AddSphere(BlockUpdates, 3, x, y, z + height, EBlock::Grass);
+	AddSphere(BlockUpdates, 6, x, y, z + height, EBlock::Grass);
 }
 
 void ProceduralTerrain::AddCylinder(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int height, int centerX, int centerY, int baseZ, EBlock blockType)

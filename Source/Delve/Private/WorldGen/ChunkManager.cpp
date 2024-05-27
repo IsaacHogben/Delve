@@ -92,7 +92,7 @@ void AChunkManager::UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition
 							FoundChunkData->Chunk->ChunkData = FoundChunkData;
 							ActiveChunkMap.Add(NewPosition, FoundChunkData);
 							AvailableChunks[i] = FoundChunkData;
-							UE_LOG(LogTemp, Warning, TEXT("Chunk found with layer %d"), FoundChunkData->GenerationLayer);
+							//UE_LOG(LogTemp, Warning, TEXT("Chunk found with layer %d"), FoundChunkData->GenerationLayer);
 						}
 						else //Spawn new chunk
 						{
@@ -281,8 +281,7 @@ void AChunkManager::EnqueueMeshUpdate(UProceduralMeshComponent* Mesh, FChunkMesh
 	Update.Vertexes = VertexCount;
 
 	MeshUpdateQueue.Enqueue(Update);
-}
-
+}//FIX HERE
 void AChunkManager::DistributeBulkChunkUpdates(TArray<FBlockUpdate> BlockUpdates)
 {
 	for (int i = 0; i < BlockUpdates.Num(); i++)
@@ -297,12 +296,12 @@ void AChunkManager::DistributeBulkChunkUpdates(TArray<FBlockUpdate> BlockUpdates
 		if (FoundChunkData != nullptr)
 		{
 			// If found, add the block update to the chunk's QueuedBlockUpdates
-			//UE_LOG(LogTemp, Warning, TEXT("BlockUpdate Sent to inactive chunk"));
+			FScopeLock Lock(&CriticalQueuedBlockUpdateAddSection);
 			(*FoundChunkData)->QueuedBlockUpdates.Add(FCachedBlockUpdate(BlockUpdates[i].Position, BlockUpdates[i].Block));
 		}
 		else
 		{
-			TArray<FCachedBlockUpdate>* ChunkUpdateCache = CachedChunkUpdateMap.Find(BlockUpdates[i].TargetChunk);
+			TArray<FCachedBlockUpdate>* ChunkUpdateCache = CachedChunkUpdateMap.Find(BlockUpdates[i].TargetChunk);//EXCEPTION_ACCESS_VIOLATION occurred here once
 			if (ChunkUpdateCache != nullptr)
 			{
 				ChunkUpdateCache->Add(FCachedBlockUpdate(BlockUpdates[i].Position, BlockUpdates[i].Block));
@@ -323,6 +322,8 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 	FThreadSafeCounter Counter(TotalChunks);
 	FEvent* AllOperationsCompleteEvent = FPlatformProcess::CreateSynchEvent(true);
 
+	FCriticalSection CriticalListSection;
+
 	UE_LOG(LogTemp, Warning, TEXT("Initial Generation of new Chunks"));
 	// Initial Generation
 	for (auto& Elem : ActiveChunkMap)
@@ -331,6 +332,11 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 			{
 				//FPlatformProcess::Sleep(2.0f); // Simulate an async operation
 				TSharedPtr<FChunkData> ChunkData = Elem.Value;
+				if (!ChunkData.IsValid())
+				{
+					UE_LOG(LogTemp, Error, TEXT("Invalid ChunkData"));
+					return;
+				}
 				if (ChunkData->GenerationLayer == ECompletedGenerationLayer::Empty)
 				{
 					//UE_LOG(LogTemp, Warning, TEXT("EmptyChunkIniialized"));
@@ -351,21 +357,27 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 	UE_LOG(LogTemp, Warning, TEXT("Selecting Chunks to Update"));
 	for (auto& Elem : ActiveChunkMap)
 	{
-		AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, Elem, &ChunkTrickleDownGenerationList, AllOperationsCompleteEvent, &Counter]()
+		AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, Elem, &ChunkTrickleDownGenerationList, AllOperationsCompleteEvent, &Counter, &CriticalListSection]()
 			{
-				//FPlatformProcess::Sleep(2.0f); // Simulate an async operation
 				TSharedPtr<FChunkData> ChunkData = Elem.Value;
 				if (ChunkData->GenerationLayer == ECompletedGenerationLayer::InitialTerrainLayer && CheckChunkForNeighbours(ChunkData))
 				{
+					FScopeLock ListLock(&CriticalListSection);
 					ChunkData->GenerationLayer = ECompletedGenerationLayer::HasNeigboursLayer;
-					ChunkTrickleDownGenerationList.Add(ChunkData); // EXCEPTION_ACCESS_VIOLATION writing address 0x0000000000000010
+					ChunkTrickleDownGenerationList.Add(ChunkData);
 				}
 				// Slip in the previously completed chunks to the list to be applied later
-				if (ChunkData->GenerationLayer == ECompletedGenerationLayer::CompleteInActive && CheckChunkForNeighbours(ChunkData))
+				else if (ChunkData->GenerationLayer == ECompletedGenerationLayer::CompleteInActive && CheckChunkForNeighbours(ChunkData))
+				{
+					FScopeLock ListLock(&CriticalListSection);
 					ChunkTrickleDownGenerationList.Add(ChunkData);
+				}
 				// Add Active chunks with new block data reaching over from neighbour chunks
-				if (ChunkData->GenerationLayer == ECompletedGenerationLayer::Complete && ChunkData->NeighbourChunks.Num() == 6 && ChunkData->QueuedBlockUpdates.Num() > 0)
+				else if (ChunkData->GenerationLayer == ECompletedGenerationLayer::Complete && ChunkData->NeighbourChunks.Num() == 6 && ChunkData->QueuedBlockUpdates.Num() > 0)
+				{
+					FScopeLock ListLock(&CriticalListSection);
 					ChunkTrickleDownGenerationList.Add(ChunkData);
+				}
 
 				if (Counter.Decrement() == 0)
 				{
@@ -387,9 +399,14 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 	UE_LOG(LogTemp, Warning, TEXT("Updating Chunks"));
 	for (auto& ChunkData : ChunkTrickleDownGenerationList)
 	{
-		AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, ChunkData, AllOperationsCompleteEvent, &Counter]() //EXCEPTION_ACCESS_VIOLATION writing address 0x000000020000000a
+		//data test can remove in clean
+		if (!ChunkData.IsValid())
+		{
+			UE_LOG(LogTemp, Error, TEXT("Invalid ChunkData"));
+			UE_LOG(LogTemp, Error, TEXT("With layer %d"), ChunkData->GenerationLayer);
+		}
+		AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, ChunkData, AllOperationsCompleteEvent, &Counter]()
 			{
-				//UE_LOG(LogTemp, Warning, TEXT("Apply Decoration"));
 				if (ChunkData->GenerationLayer == ECompletedGenerationLayer::HasNeigboursLayer || ChunkData->GenerationLayer == ECompletedGenerationLayer::Complete)
 				{
 					StartDecorationApplication(ChunkData);
@@ -404,20 +421,32 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 	AllOperationsCompleteEvent->Wait();
 	AllOperationsCompleteEvent->Reset();
 
-	//UE_LOG(LogTemp, Warning, TEXT("Found %d chunks with completed decorations"), ChunkTrickleDownGenerationList.Num());
-
 	Counter.Set(ChunkTrickleDownGenerationList.Num());
 
 	UE_LOG(LogTemp, Warning, TEXT("Applying Meshes"));
 	for (auto& ChunkData : ChunkTrickleDownGenerationList)
 	{
-		//UE_LOG(LogTemp, Warning, TEXT("Chunk %d.%d.%d"), ChunkData->Position.X, ChunkData->Position.Y, ChunkData->Position.Z);
-		//UE_LOG(LogTemp, Warning, TEXT("Operation on Layer %d .Num Neighbours % d"), ChunkData->GenerationLayer, ChunkData->NeighbourChunks.Num());
 		AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, ChunkData, AllOperationsCompleteEvent, &Counter]()
 			{
-				//UE_LOG(LogTemp, Warning, TEXT("Apply Mesh"));
 				ChunkData->Chunk->ApplyMesh();
 				ChunkData->GenerationLayer = ECompletedGenerationLayer::Complete;
+				if (Counter.Decrement() == 0)
+				{
+					AllOperationsCompleteEvent->Trigger();
+				}
+			});
+	}
+	AllOperationsCompleteEvent->Wait();
+	AllOperationsCompleteEvent->Reset();
+
+	Counter.Set(ChunkTrickleDownGenerationList.Num());
+
+	UE_LOG(LogTemp, Warning, TEXT("Performing CleanUp"));
+	for (auto& ChunkData : ChunkTrickleDownGenerationList)
+	{
+		AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, ChunkData, AllOperationsCompleteEvent, &Counter]()
+			{
+				CleanUpCachedData(ChunkData);
 				if (Counter.Decrement() == 0)
 				{
 					AllOperationsCompleteEvent->Trigger();
@@ -441,12 +470,15 @@ void AChunkManager::StartDecorationApplication(TSharedPtr<FChunkData> ChunkData)
 	{
 		TArray<FCachedBlockUpdate> UpdatesToAppend = *ChunkUpdateCached;
 		ChunkData->QueuedBlockUpdates.Append(UpdatesToAppend);
-		CachedChunkUpdateMap.Remove(ChunkData->Position);
+		//CachedChunkUpdateMap.Remove(ChunkData->Position);
 	}
 	// Do application operation
-	ChunkData->Chunk->ModifyVoxelsInterChunkLayer(ChunkData->QueuedBlockUpdates);
-	ChunkData->QueuedBlockUpdates.Empty();
-	ChunkData->HasDistributedDecorations = true;
+	//if (ChunkData->QueuedBlockUpdates.Num() > 0)
+	{
+		ChunkData->Chunk->ModifyVoxelsInterChunkLayer(ChunkData->QueuedBlockUpdates);
+		ChunkData->QueuedBlockUpdates.Empty();
+		ChunkData->HasDistributedDecorations = true;
+	}
 }
 
 EBlock AChunkManager::GetBlockFromChunk(const FIntVector& BlockIndex, const FIntVector& ChunkIndex)
@@ -456,13 +488,10 @@ EBlock AChunkManager::GetBlockFromChunk(const FIntVector& BlockIndex, const FInt
 
 bool AChunkManager::GetSixPointers(TSharedPtr<FChunkData> ChunkData)
 {
-	//UE_LOG(LogTemp, Warning, TEXT("-----------"));
-	//UE_LOG(LogTemp, Warning, TEXT("Searching Chunk %d.%d.%d"));
 	for (int i = 0; i < 3; i++)
 	{
 		for (int j = -1; j < 2; j += 2)
 		{
-			//UE_LOG(LogTemp, Warning, TEXT("j %d"), j);
 			FIntVector Direction = FIntVector::ZeroValue;
 			Direction[i] += j;
 			FIntVector TargetPosition = ChunkData->Position + Direction;
@@ -471,7 +500,6 @@ bool AChunkManager::GetSixPointers(TSharedPtr<FChunkData> ChunkData)
 			TSharedPtr<FChunkData> Neighbour = NeighbourPtr ? *NeighbourPtr : nullptr;
 			if (Neighbour)
 			{
-				//UE_LOG(LogTemp, Warning, TEXT("gp"));
 				ChunkData->NeighbourChunks.Add(Neighbour);
 			}
 			else
@@ -500,6 +528,17 @@ void AChunkManager::Tick(float DeltaTime)
 		UpdateMeshSection(Update.Mesh, Update.MeshData, Update.Transform, Update.Lod, Update.Vertexes);
 		
 		UpdatesProcessedThisTick++;
+	}
+}
+
+void AChunkManager::CleanUpCachedData(TSharedPtr<FChunkData> ChunkData)
+{
+	TArray<FCachedBlockUpdate>* ChunkUpdateCached = CachedChunkUpdateMap.Find(ChunkData->Position);
+	if (ChunkUpdateCached != nullptr)
+	{
+		TArray<FCachedBlockUpdate> UpdatesToClean = *ChunkUpdateCached;
+		if (UpdatesToClean.Num() == 0)
+			CachedChunkUpdateMap.Remove(ChunkData->Position);
 	}
 }
 

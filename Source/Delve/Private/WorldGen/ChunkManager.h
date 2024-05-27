@@ -89,4 +89,6 @@ private:
 	//UProceduralMeshComponent* Mesh;
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+	void CleanUpCachedData(TSharedPtr<FChunkData> ChunkData);
+	FCriticalSection CriticalQueuedBlockUpdateAddSection;
 };
