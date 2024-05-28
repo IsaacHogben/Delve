@@ -8,6 +8,7 @@
 #include "ProceduralTerrain.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
+#include "NoiseManager.h"
 
 #include "Misc/DateTime.h"
 #include "../Utils/Enums.h"
@@ -20,6 +21,7 @@
 
 class UProceduralMeshComponent;
 class AChunkManager; // Forward declaration of AChunkManager
+class ProceduralTerrain;
 
 struct FBlockUpdate;
 struct FCachedBlockUpdate;
@@ -55,6 +57,7 @@ public:
 	UPROPERTY()
 	UProceduralMeshComponent* Mesh;
 
+	ProceduralTerrain* TerrainGenerator;
 	TSharedPtr<FChunkData> ChunkData;
 
 	//Variables
@@ -73,14 +76,10 @@ public:
 	int Lod = 1;
 	TObjectPtr<UMaterialInterface> Material;
 
-	// Terrain
-	UPROPERTY(EditAnywhere, Category = "Terrain Settings")
-	float Frequency = 0.015;
-
 	UFUNCTION(BlueprintCallable, Category = "Chunk")
 	FIntVector ModifyVoxel(FIntVector& Position, const EBlock& Block, bool RegenerateMesh);
 	void ModifyVoxels(TArray<FCachedBlockUpdate>& BlockUpdates, bool RegenerateMesh);
-	void ModifyVoxelsInterChunkLayer(TArray<FCachedBlockUpdate>& BlockUpdates);
+
 	void ApplyMesh();
 	void ClearMesh();
 	EBlock GetBlock(FIntVector Index, bool checkOutsideChunk);
@@ -108,15 +107,11 @@ private:
 	
 	bool IsChunkEmpty = true;
 
-	void GenerateChunkAsync();
-	void GenerateChunkAsyncComplete();
-
 	void UpdateChunkLodAsync(int RenderDistance, const float Distance, const FVector PlayerPosition);
 	void GetLod(int RenderDistance, const float& Distance, bool& ContinueToUpdate);
 	void UpdatePerspectiveMask(const FVector& PlayerPosition, bool& ContinueToUpdate);
 	void UpdateChunkAsyncComplete();
 
-	void UpdateChunkPositionAsync();
 
 	//Mesh
 	void AGenerateMesh();

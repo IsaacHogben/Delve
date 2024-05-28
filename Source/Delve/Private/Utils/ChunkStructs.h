@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "../WorldGen/ChunkClass.h"
 #include "../WorldGen/Octree.h"
+#include "FastNoiseLite.h"
+
 #include "ChunkStructs.Generated.h"
 
 class UChunkClass;

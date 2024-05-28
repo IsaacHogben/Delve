@@ -26,10 +26,10 @@ void UChunkClass::Setup()
 {
 	MeshData = new FChunkMeshData();
 
-	Noise = new FastNoiseLite(999);
+	/*Noise = new FastNoiseLite(999);
 	Noise->SetFrequency(Frequency);
 	Noise->SetNoiseType(FastNoiseLite::NoiseType_Perlin);
-	Noise->SetFractalType(FastNoiseLite::FractalType_FBm);
+	Noise->SetFractalType(FastNoiseLite::FractalType_FBm);*/
 
 	//ChunkWorldPosition = ChunkWorldPosition;
 	ChunkData->Position = FIntVector(
@@ -39,29 +39,6 @@ void UChunkClass::Setup()
 
 	BlockSize = WorldScale * Lod;
 	PerspectiveMask = CalculatePerspectiveMask(ChunkWorldPosition / ChunkSize);//playerpos
-}
-
-void UChunkClass::StartAsyncChunkGen(const FVector& PlayerPosition)
-{
-	FGraphEventRef FirstTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this, PlayerPosition]() {
-		GenerateChunkAsync();
-		}, TStatId(), nullptr, ENamedThreads::AnyBackgroundThreadNormalTask);
-
-	FGraphEventRef SecondTask = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
-		GenerateChunkAsyncComplete();
-		}, TStatId(), FirstTask, ENamedThreads::GameThread);
-
-}
-
-void UChunkClass::GenerateChunkAsync()
-{
-	
-}
-
-void UChunkClass::GenerateChunkAsyncComplete()
-{
-	//ChunkManager->UpdateChunkGenerationLayerStatus(ChunkData->GenerationLayer);
-	//Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
 }
 
 void UChunkClass::StartAsyncChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition)
@@ -139,19 +116,6 @@ void UChunkClass::UpdatePerspectiveMask(const FVector& PlayerPosition, bool& Con
 			}
 		}
 	}
-}
-
-void UChunkClass::UpdateChunkPositionAsync()
-{
-	//bool ContinueToUpdate = true;
-	//if (!ChunkData.IsValid())
-	//{
-	//	UE_LOG(LogTemp, Error, TEXT("ChunkData is invalid!"));
-	//}
-
-	////Update Position
-	//ChunkWorldPosition = FVector(ChunkData->Position) * ChunkSize;
-
 }
 
 void UChunkClass::UpdateChunkAsyncComplete()
@@ -392,6 +356,7 @@ void UChunkClass::ApplyMesh()
 	ClearMeshData();
 	AGenerateMesh();
 	//Return to game thread
+
 	AsyncTask(ENamedThreads::GameThread, [this]()
 		{	
 		if (Mesh)
@@ -425,7 +390,7 @@ void UChunkClass::ClearMesh()
 void UChunkClass::GenerateProceduralTerrain()
 {
 	ChunkData->Blocks.SetNum((ChunkSize) * (ChunkSize) * (ChunkSize));
-	TArray<FCachedBlockUpdate> DecoBlockUpdates = ProceduralTerrain::GetGeneratedChunk(ChunkWorldPosition, ChunkData->Position, ChunkSize, ChunkData->Blocks, Noise, IsChunkEmpty);
+	TArray<FCachedBlockUpdate> DecoBlockUpdates = TerrainGenerator->GetGeneratedChunk(ChunkWorldPosition, ChunkData->Position, ChunkData->Blocks, IsChunkEmpty);
 
 	ModifyVoxels(DecoBlockUpdates, false);
 }
@@ -452,7 +417,7 @@ EBlock UChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
 		}
 	}
 	// Else returns request from within the array
-	return ChunkData->Blocks[ProceduralTerrain::GetBlockIndex(Index.X, Index.Y, Index.Z)];
+	return ChunkData->Blocks[TerrainGenerator->GetBlockIndex(Index.X, Index.Y, Index.Z)];
 }
 
 int UChunkClass::GetTextureIndex(EBlock Block, FVector Normal) const
@@ -471,7 +436,7 @@ int UChunkClass::GetTextureIndex(EBlock Block, FVector Normal) const
 
 void UChunkClass::ModifyVoxelData(const FIntVector Position, const EBlock Block)
 {
-	const int Index = ProceduralTerrain::GetBlockIndex(Position.X, Position.Y, Position.Z);
+	const int Index = TerrainGenerator->GetBlockIndex(Position.X, Position.Y, Position.Z);
 
 	ChunkData->Blocks[Index] = Block;
 }
@@ -537,13 +502,6 @@ void UChunkClass::ModifyVoxels(TArray<FCachedBlockUpdate>& BlockUpdates, bool Re
 		AGenerateMesh();
 		Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
 	}
-}
-
-void UChunkClass::ModifyVoxelsInterChunkLayer(TArray<FCachedBlockUpdate>& BlockUpdates)
-{
-	ModifyVoxels(BlockUpdates, false);
-	//UE_LOG(LogTemp, Warning, TEXT("Chunk layer update from %d.%d.%d"), ChunkData->Position.X, ChunkData->Position.Y, ChunkData->Position.Z);
-
 }
 
 void UChunkClass::TaskGraphDebugLog()

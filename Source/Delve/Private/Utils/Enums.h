@@ -9,7 +9,7 @@ enum class EDirection : uint8
 UENUM(BlueprintType)
 enum class EBlock : uint8
 {
-	Null, Air, Stone, Dirt, Grass
+	Null, Air, Stone, Dirt, Grass, Leaves
 };
 
 UENUM(BlueprintType)
@@ -26,10 +26,4 @@ enum class ECompletedGenerationLayer : uint8
 	Complete,
 	//Used by completed chunks that are chached or saved
 	CompleteInActive
-};
-
-UENUM(BlueprintType)
-enum class EDeliverUpdateDirection : uint8
-{
-	None, North, South, East, West, Up, Down
 };

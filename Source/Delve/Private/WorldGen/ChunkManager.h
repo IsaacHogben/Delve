@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "ChunkRenderDistance.h"
 #include "ChunkInclude.h"
-#include "Octree.h"
+#include "NoiseManager.h"
 
 #include "../Utils/ChunkMeshData.h"
 #include "../Utils/VectorFunctionUtils.h"
@@ -15,6 +15,8 @@
 #include "ChunkManager.generated.h"
 
 class UChunkClass;
+class UNoiseManager;
+class ProceduralTerrain;
 struct FChunkData;
 struct FBlockUpdate;
 struct FCachedBlockUpdate;
@@ -41,10 +43,12 @@ public:
 	int RenderDistance = 1;
 
 	UPROPERTY(EditAnywhere, Category = "Generation Settings")
-	float MainFreqency = 0.015;
+	TArray<FFastNoise> GenerationNoiseArray;
 
-	UPROPERTY(EditAnywhere, Category = "Generation Settings")
+	UPROPERTY(EditAnywhere, Category = "Material Settings")
 	TObjectPtr<UMaterialInterface> Material;
+
+	UNoiseManager* NoiseManager;
 
 	UProceduralMeshComponent* CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod);
 
@@ -54,7 +58,6 @@ public:
 	FIntVector PreviousPlayerChunkPosition;
 
 	void EnqueueMeshUpdate(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector ChunkWorldPosition, int Lod, int VertexCount);
-
 	void DistributeBulkChunkUpdates(TArray<FBlockUpdate> BlockUpdates);
 	void UpdateChunkGenerationLayerStatus();
 	void StartDecorationApplication(TSharedPtr<FChunkData> ChunkData);
@@ -68,6 +71,7 @@ protected:
 	void SpawnChunk(FChunkData dataArray, FIntVector CentralRenderChunkVector);
 
 private:
+	ProceduralTerrain* TerrainGenerator;
 	int TotalChunks;
 	int ChunkGenerationLayersExpected[3]; //use array when more layers are nescessary.
 
@@ -91,4 +95,5 @@ private:
 	virtual void Tick(float DeltaTime) override;
 	void CleanUpCachedData(TSharedPtr<FChunkData> ChunkData);
 	FCriticalSection CriticalQueuedBlockUpdateAddSection;
+	UExecutionTimer* UpdateProfileTimer;
 };
