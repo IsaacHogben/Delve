@@ -19,6 +19,11 @@ void UChunkClass::BeginGeneration()
 {
 	Setup();
 	GenerateProceduralTerrain();
+	AsyncTask(ENamedThreads::GameThread, [this]()
+		{	//Can slow game as mesh section creation isnt queued
+			Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
+		});
+
 }
 
 // Setup of the chunk class. Only done once
@@ -271,7 +276,7 @@ void UChunkClass::CreateQuad(const FMask Mask, const FIntVector AxisMask, const 
 		V4 * BlockSize
 		});
 
-	MeshData->Triangles.Append({
+	MeshData->Triangles.Append({// EXCEPTION_ACCESS_VIOLATION reading address 0xffffffffffffffff
 		VertexCount,
 		VertexCount + 2 + Mask.Normal,
 		VertexCount + 2 - Mask.Normal,
@@ -353,19 +358,17 @@ TArray<FIntVector> UChunkClass::CalculatePerspectiveMask(FVector PlayerPosition)
 
 void UChunkClass::ApplyMesh()
 {
-	ClearMeshData();
 	AGenerateMesh();
-	//Return to game thread
-
-	AsyncTask(ENamedThreads::GameThread, [this]()
-		{	
-		if (Mesh)
-		{
-			ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
-		}
-		else
-			Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
-		});
+	
+	if (Mesh)
+	{
+		ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
+		ClearMeshData();
+	}
+	else//Return to game thread
+	{
+		
+	}	
 }
 
 void UChunkClass::ClearMeshData()
@@ -430,6 +433,8 @@ int UChunkClass::GetTextureIndex(EBlock Block, FVector Normal) const
 	}
 	case EBlock::Dirt: return 2;
 	case EBlock::Stone: return 1;
+	case EBlock::Leaves: return 3;
+	case EBlock::Null: return 4;
 	default: return 255;
 	}
 }
@@ -472,8 +477,6 @@ FIntVector UChunkClass::ModifyVoxel(FIntVector& Position, const EBlock& Block, b
 		ModifyVoxelData(Position, Block);
 		if (RegenerateMesh)
 		{
-			ClearMeshData();
-			AGenerateMesh();
 			ApplyMesh();
 		}
 	}
@@ -483,8 +486,6 @@ FIntVector UChunkClass::ModifyVoxel(FIntVector& Position, const EBlock& Block, b
 // Also handles the redirects so all changes go through here. BlockUpdates should be deleted after being sent here.
 void UChunkClass::ModifyVoxels(TArray<FCachedBlockUpdate>& BlockUpdates, bool RegenerateMesh)
 {
-	//UE_LOG(LogTemp, Warning, TEXT("num negihbs in CC %d %d"), ChunkData->NeighbourChunks.Num(), ChunkData->HasDistributedDecorations);
-
 	TArray<FBlockUpdate> RedirectBlockUpdates;
 	FIntVector RedirectChunk;
 	for (int i = 0; i < BlockUpdates.Num(); i++)//not seeing any changes from the second update
@@ -498,9 +499,7 @@ void UChunkClass::ModifyVoxels(TArray<FCachedBlockUpdate>& BlockUpdates, bool Re
 	ChunkManager->DistributeBulkChunkUpdates(RedirectBlockUpdates);
 	if (RegenerateMesh)
 	{
-		ClearMeshData();
-		AGenerateMesh();
-		Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
+		ApplyMesh();
 	}
 }
 

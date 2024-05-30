@@ -31,7 +31,7 @@ void AChunkManager::BeginPlay()
 	//Setup
 	NoiseManager = NewObject<UNoiseManager>();
 	NoiseManager->InitializeArray(GenerationNoiseArray);
-	TerrainGenerator = new ProceduralTerrain();
+	TerrainGenerator = NewObject <UProceduralTerrain>();
 	TerrainGenerator->N = NoiseManager;
 
 	GenerateChunks(PreviousPlayerChunkPosition);
@@ -194,6 +194,7 @@ void AChunkManager::SpawnChunk(FChunkData data, FIntVector CentralRenderChunkVec
 	ActiveChunkMap.Add(ChunkData->Position, ChunkData);
 }
 
+// Unused
 void AChunkManager::StartChunkGeneration()
 {
 	for (auto& Elem : ActiveChunkMap)
@@ -235,13 +236,13 @@ UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData* MeshD
 	return Mesh;
 }
 
-void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector Transform, int Lod, int Vertexes)
+void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData& MeshData, FVector Transform, int Lod, int Vertexes)
 {
 	if (!Vertexes)
 	{
 		Mesh->ClearAllMeshSections();
-		return; //EXCEPTION_ACCESS_VIOLATION reading address 11
-	}	
+		return; //EXCEPTION_ACCESS_VIOLATION reading address 111
+	}
 
 	// Calculate Transform
 	auto MeshTransform = FTransform(
@@ -261,7 +262,7 @@ void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMesh
 		Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Mesh->SetCastShadow(false);
 	}
-	Mesh->CreateMeshSection( //EXCEPTION_ACCESS_VIOLATION reading address 1
+	Mesh->CreateMeshSection( //EXCEPTION_ACCESS_VIOLATION reading address 11
 		0,
 		MeshData.Vertices,
 		MeshData.Triangles,
@@ -273,12 +274,10 @@ void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMesh
 	);
 
 	MeshData.Clear();
-	//UE_LOG(LogTemp, Warning, TEXT("Updated Mesh with %d Vertexes"), Vertexes);
-
 }
 
 // Enqueue a mesh update function
-void AChunkManager::EnqueueMeshUpdate(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector ChunkWorldPosition, int Lod, int VertexCount)
+void AChunkManager::EnqueueMeshUpdate(UProceduralMeshComponent* Mesh, FChunkMeshData& MeshData, FVector ChunkWorldPosition, int Lod, int VertexCount)
 {
 	FQueuedMeshUpdate Update = FQueuedMeshUpdate();
 	Update.Mesh = Mesh;
@@ -309,14 +308,14 @@ void AChunkManager::DistributeBulkChunkUpdates(TArray<FBlockUpdate> BlockUpdates
 		}
 		else
 		{
-			TArray<FCachedBlockUpdate>* ChunkUpdateCache = CachedChunkUpdateMap.Find(BlockUpdates[i].TargetChunk);//EXCEPTION_ACCESS_VIOLATION occurred here once
+			TArray<FCachedBlockUpdate>* ChunkUpdateCache = CachedChunkUpdateMap.Find(BlockUpdates[i].TargetChunk);//EXCEPTION_ACCESS_VIOLATION occurred here
 			if (ChunkUpdateCache != nullptr)
 			{
 				ChunkUpdateCache->Add(FCachedBlockUpdate(BlockUpdates[i].Position, BlockUpdates[i].Block));
 			}
 			else
 			{
-				ChunkUpdateCache = &CachedChunkUpdateMap.Add(BlockUpdates[i].TargetChunk);
+				ChunkUpdateCache = &CachedChunkUpdateMap.Add(BlockUpdates[i].TargetChunk);//EXCEPTION_ACCESS_VIOLATION occurred here
 				ChunkUpdateCache->Add(FCachedBlockUpdate(BlockUpdates[i].Position, BlockUpdates[i].Block));
 			}
 		}
@@ -336,7 +335,7 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 	// Initial Generation
 	for (auto& Elem : ActiveChunkMap)
 	{
-		AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, Elem, AllOperationsCompleteEvent, &Counter]()
+		AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, Elem, AllOperationsCompleteEvent, &Counter]()
 			{
 				//FPlatformProcess::Sleep(2.0f); // Simulate an async operation
 				TSharedPtr<FChunkData> ChunkData = Elem.Value;
@@ -434,7 +433,7 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 	UE_LOG(LogTemp, Warning, TEXT("%f:Applying Meshes"), UpdateProfileTimer->GetReset());
 	for (auto& ChunkData : ChunkTrickleDownGenerationList)
 	{
-		AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, ChunkData, AllOperationsCompleteEvent, &Counter]()
+		AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, ChunkData, AllOperationsCompleteEvent, &Counter]()
 			{
 				ChunkData->Chunk->ApplyMesh();
 				ChunkData->GenerationLayer = ECompletedGenerationLayer::Complete;
@@ -478,7 +477,6 @@ void AChunkManager::StartDecorationApplication(TSharedPtr<FChunkData> ChunkData)
 	{
 		TArray<FCachedBlockUpdate> UpdatesToAppend = *ChunkUpdateCached;
 		ChunkData->QueuedBlockUpdates.Append(UpdatesToAppend);
-		//CachedChunkUpdateMap.Remove(ChunkData->Position);
 	}
 	// Do application operation
 	//if (ChunkData->QueuedBlockUpdates.Num() > 0)
@@ -524,17 +522,27 @@ bool AChunkManager::GetSixPointers(TSharedPtr<FChunkData> ChunkData)
 void AChunkManager::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	// Define the maximum number of updates to process per tick
-	const int32 MaxUpdatesPerTick = 1; // Adjust as needed
+
+	// Define a target fraction of the frame time to spend on updates
+	const float TargetUpdateTimeFraction = 0.01f; // Adjust as needed (e.g., 0.002 means 0.2% of the frame time)
+	float AvailableTimeForUpdates = DeltaTime * TargetUpdateTimeFraction;
+
+	// Define an approximate time cost for a single update
+	const float ApproxUpdateTime = 0.002f; // This value should be estimated based on profiling or empirical data
+
+	// Calculate the maximum number of updates to process based on available time
+	int32 MaxUpdatesPerTick = FMath::Max(1, FMath::FloorToInt(AvailableTimeForUpdates / ApproxUpdateTime));
+
 	// Counter to track the number of updates processed
 	int32 UpdatesProcessedThisTick = 0;
+
 	while (!MeshUpdateQueue.IsEmpty() && UpdatesProcessedThisTick < MaxUpdatesPerTick)
-	{	
+	{
 		FQueuedMeshUpdate Update;
 		MeshUpdateQueue.Dequeue(Update);
 
 		UpdateMeshSection(Update.Mesh, Update.MeshData, Update.Transform, Update.Lod, Update.Vertexes);
-		
+
 		UpdatesProcessedThisTick++;
 	}
 }

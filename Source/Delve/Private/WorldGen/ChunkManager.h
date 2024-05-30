@@ -16,7 +16,7 @@
 
 class UChunkClass;
 class UNoiseManager;
-class ProceduralTerrain;
+class UProceduralTerrain;
 struct FChunkData;
 struct FBlockUpdate;
 struct FCachedBlockUpdate;
@@ -48,16 +48,16 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Material Settings")
 	TObjectPtr<UMaterialInterface> Material;
 
-	UNoiseManager* NoiseManager;
+	
 
 	UProceduralMeshComponent* CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod);
 
-	void UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector Transform, int Lod, int Vertices);
+	void UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData& MeshData, FVector Transform, int Lod, int Vertices);
 	
 	UPROPERTY()
 	FIntVector PreviousPlayerChunkPosition;
 
-	void EnqueueMeshUpdate(UProceduralMeshComponent* Mesh, FChunkMeshData MeshData, FVector ChunkWorldPosition, int Lod, int VertexCount);
+	void EnqueueMeshUpdate(UProceduralMeshComponent* Mesh, FChunkMeshData& MeshData, FVector ChunkWorldPosition, int Lod, int VertexCount);
 	void DistributeBulkChunkUpdates(TArray<FBlockUpdate> BlockUpdates);
 	void UpdateChunkGenerationLayerStatus();
 	void StartDecorationApplication(TSharedPtr<FChunkData> ChunkData);
@@ -71,7 +71,11 @@ protected:
 	void SpawnChunk(FChunkData dataArray, FIntVector CentralRenderChunkVector);
 
 private:
-	ProceduralTerrain* TerrainGenerator;
+	UPROPERTY()
+	UNoiseManager* NoiseManager;
+	UPROPERTY()
+	UProceduralTerrain* TerrainGenerator;
+
 	int TotalChunks;
 	int ChunkGenerationLayersExpected[3]; //use array when more layers are nescessary.
 

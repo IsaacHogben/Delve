@@ -3,6 +3,11 @@
 
 #include "WorldGen/NoiseManager.h"
 
+UNoiseManager::~UNoiseManager()
+{
+	UE_LOG(LogTemp, Warning, TEXT("NoiseManager Deconstructor called"));
+}
+
 void UNoiseManager::InitializeArray(TArray<FFastNoise> NoiseArray)
 {
 	BaseNoise = InitializeNoise(NoiseArray[0]);

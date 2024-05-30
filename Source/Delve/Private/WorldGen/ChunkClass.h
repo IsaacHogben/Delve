@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "ChunkInclude.h"
 #include "ChunkRenderDistance.h"
-#include "ProceduralTerrain.h"
+//#include "ProceduralTerrain.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
 #include "NoiseManager.h"
@@ -21,7 +21,7 @@
 
 class UProceduralMeshComponent;
 class AChunkManager; // Forward declaration of AChunkManager
-class ProceduralTerrain;
+class UProceduralTerrain;
 
 struct FBlockUpdate;
 struct FCachedBlockUpdate;
@@ -57,7 +57,7 @@ public:
 	UPROPERTY()
 	UProceduralMeshComponent* Mesh;
 
-	ProceduralTerrain* TerrainGenerator;
+	UProceduralTerrain* TerrainGenerator;
 	TSharedPtr<FChunkData> ChunkData;
 
 	//Variables

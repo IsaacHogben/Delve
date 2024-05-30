@@ -7,17 +7,22 @@
 #include "../Utils/FastNoiseLite.h"
 #include "../Utils/ChunkStructs.h"
 
+#include "ProceduralTerrain.generated.h"
+
 class UNoiseManager;
 struct FCachedBlockUpdate;
 struct FFastNoise;
 /**
  * 
  */
-class ProceduralTerrain
+UCLASS()
+class UProceduralTerrain : public UObject
 {
+	GENERATED_BODY()
+
 public:
-	ProceduralTerrain();
-	~ProceduralTerrain();
+	UProceduralTerrain();
+	~UProceduralTerrain();
 	UPROPERTY()
 	UNoiseManager* N;
 

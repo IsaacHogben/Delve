@@ -4,16 +4,19 @@
 #include "WorldGen/ProceduralTerrain.h"
 #include "NoiseManager.h"
 
-ProceduralTerrain::ProceduralTerrain()
+UProceduralTerrain::UProceduralTerrain()
 {
 }
 
-ProceduralTerrain::~ProceduralTerrain()
+UProceduralTerrain::~UProceduralTerrain()
 {
+	UE_LOG(LogTemp, Warning, TEXT("ProceduralTerrain Deconstructor called"));
 }
 
 int QuantizeCoordinate(int value, int quantizationStep)
 {
+	if (quantizationStep == 0)
+		return value;
 	return (value / quantizationStep) * quantizationStep;
 }
 
@@ -30,7 +33,7 @@ float GetQuantizedNoise(int x, int y, int z, FastNoiseLite* Noise)
 	return Noise->GetNoise(float(x), float(y), quantizedZ);
 }
 
-int ProceduralTerrain::GetBlockIndex(int X, int Y, int Z)
+int UProceduralTerrain::GetBlockIndex(int X, int Y, int Z)
 {
 	int IndexSize = 262144;
 	int r = Z * ChunkSize * ChunkSize + Y * ChunkSize + X;
@@ -39,19 +42,21 @@ int ProceduralTerrain::GetBlockIndex(int X, int Y, int Z)
 	return r;
 }
 
-float ProceduralTerrain::GetNoiseLevelOne(float x, float y, float z)
+float UProceduralTerrain::GetNoiseLevelOne(float x, float y, float z)
 {
 	float CliffRegion = N->CliffNoise->GetNoise(x, y, z);
 
-	if (CliffRegion > 0)
-		z = QuantizeCoordinate(z, 5);
+	if (CliffRegion < -0.88)
+		z = QuantizeCoordinate(z, (((N->BaseNoise->GetNoise(0.0f, 0.0f, z)/2) + 1) * 8) - 3);//extra math not doing much atm
 
 	return N->BaseNoise->GetNoise(x, y, z);
 }
 
-EBlock ProceduralTerrain::GetTerrainLevelOne(float x, float y, float z)
+EBlock UProceduralTerrain::GetTerrainLevelOne(float x, float y, float z)
 {
-	//if (1) return EBlock::Air;
+	//NoiseTest
+	float CliffRegion = N->CliffNoise->GetNoise(x, y, z);
+
 	const auto SurfaceValue = 0;
 	const auto Value = GetNoiseLevelOne(x, y, z);
 	const auto UpValue = GetNoiseLevelOne(x, y, z + 1);
@@ -79,7 +84,7 @@ EBlock ProceduralTerrain::GetTerrainLevelOne(float x, float y, float z)
 
 
 //Generates first layer terrain and returns FBulkBlockUpdate for additional levels of modification.
-TArray<FCachedBlockUpdate> ProceduralTerrain::GetGeneratedChunk(FVector ChunkPosition, FIntVector ChunkVectorPosition, TArray<EBlock>& BlockArray, bool& IsChunkEmpty)
+TArray<FCachedBlockUpdate> UProceduralTerrain::GetGeneratedChunk(FVector ChunkPosition, FIntVector ChunkVectorPosition, TArray<EBlock>& BlockArray, bool& IsChunkEmpty)
 {
 	TArray<FCachedBlockUpdate> BlockUpdates;
 	IsChunkEmpty = false; //WILL NEVER TRIGER! TODO
@@ -109,21 +114,21 @@ TArray<FCachedBlockUpdate> ProceduralTerrain::GetGeneratedChunk(FVector ChunkPos
 	return BlockUpdates;
 }
 
-bool ProceduralTerrain::IsSurfaceBlock(float UpValue, float Density)
+bool UProceduralTerrain::IsSurfaceBlock(float UpValue, float Density)
 {
 	if (IsAir(UpValue, Density))
 		return true;
 	return false;
 }
 
-bool ProceduralTerrain::IsAir(float Value, float Density)
+bool UProceduralTerrain::IsAir(float Value, float Density)
 {
 	if (Value >= Density)
 		return true;
 	return false;
 }
 
-void ProceduralTerrain::AddReferencelessDecorations(TArray<EBlock>& BlockArray, FastNoiseLite* Noise, TArray<FCachedBlockUpdate>& BlockUpdates)
+void UProceduralTerrain::AddReferencelessDecorations(TArray<EBlock>& BlockArray, FastNoiseLite* Noise, TArray<FCachedBlockUpdate>& BlockUpdates)
 {
 	EBlock Block;
 	for (int x = 0; x < ChunkSize + 2; ++x)
@@ -149,7 +154,7 @@ void ProceduralTerrain::AddReferencelessDecorations(TArray<EBlock>& BlockArray, 
 	}
 }
 
-void ProceduralTerrain::MakeTestShape(TArray<FCachedBlockUpdate>& BlockUpdates, int x, int y, int z)
+void UProceduralTerrain::MakeTestShape(TArray<FCachedBlockUpdate>& BlockUpdates, int x, int y, int z)
 {
 	//BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y, z), EBlock::Stone));
 	//int r = 44;
@@ -170,7 +175,7 @@ void ProceduralTerrain::MakeTestShape(TArray<FCachedBlockUpdate>& BlockUpdates, 
 	}
 }
 
-void ProceduralTerrain::MakeTestTree(TArray<FCachedBlockUpdate>& BlockUpdates, int height, int x, int y, int z)
+void UProceduralTerrain::MakeTestTree(TArray<FCachedBlockUpdate>& BlockUpdates, int height, int x, int y, int z)
 {
 	//BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y, z), EBlock::Stone));
 	//int r = 44;
@@ -181,7 +186,7 @@ void ProceduralTerrain::MakeTestTree(TArray<FCachedBlockUpdate>& BlockUpdates, i
 	AddSphere(BlockUpdates, 6, x, y, z + height, EBlock::Leaves);
 }
 
-void ProceduralTerrain::AddCylinder(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int height, int centerX, int centerY, int baseZ, EBlock blockType)
+void UProceduralTerrain::AddCylinder(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int height, int centerX, int centerY, int baseZ, EBlock blockType)
 {
 	for (int z = 0; z < height; ++z)
 	{
@@ -198,7 +203,7 @@ void ProceduralTerrain::AddCylinder(TArray<FCachedBlockUpdate>& BlockUpdates, in
 	}
 }
 
-void ProceduralTerrain::AddSphere(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int centerX, int centerY, int centerZ, EBlock blockType)
+void UProceduralTerrain::AddSphere(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int centerX, int centerY, int centerZ, EBlock blockType)
 {
 	for (int x = -radius; x <= radius; ++x)
 	{

@@ -115,6 +115,8 @@ class UNoiseManager : public UObject
 	GENERATED_BODY()
 
 public:
+	~UNoiseManager();
+
 	void InitializeArray(TArray<FFastNoise> NoiseArray);
 	FastNoiseLite* InitializeNoise(FFastNoise& NoiseSettings);
 

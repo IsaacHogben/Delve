@@ -20,6 +20,7 @@
 
 #include "ChunkManager.h"
 #include "ChunkClass.h"
+#include "ProceduralTerrain.h"
 
 
 /**

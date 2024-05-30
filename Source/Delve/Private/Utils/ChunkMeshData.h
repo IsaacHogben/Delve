@@ -21,6 +21,19 @@ public:
 	UPROPERTY()
 	TArray<FVector2D> UV0;
 
+	// Default constructor
+	FChunkMeshData() {}
+
+	// Copy constructor
+	FChunkMeshData(const FChunkMeshData& Other)
+	{
+		Vertices = Other.Vertices;
+		Triangles = Other.Triangles;
+		Normals = Other.Normals;
+		Colors = Other.Colors;
+		UV0 = Other.UV0;
+	}
+
 	void Clear();
 };
 
