@@ -523,20 +523,19 @@ void AChunkManager::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// Define a target fraction of the frame time to spend on updates
-	const float TargetUpdateTimeFraction = 0.01f; // Adjust as needed (e.g., 0.002 means 0.2% of the frame time)
-	float AvailableTimeForUpdates = DeltaTime * TargetUpdateTimeFraction;
+	// Define the base and maximum updates per tick
+	const int BaseUpdatesPerTick = 4;
+	const int MaxUpdatesPerTick = 32; // Maximum updates to allow per frame
 
-	// Define an approximate time cost for a single update
-	const float ApproxUpdateTime = 0.002f; // This value should be estimated based on profiling or empirical data
-
-	// Calculate the maximum number of updates to process based on available time
-	int32 MaxUpdatesPerTick = FMath::Max(1, FMath::FloorToInt(AvailableTimeForUpdates / ApproxUpdateTime));
+	// Calculate target updates per tick based on DeltaTime
+	// Assuming a base frame rate of 60 FPS for reference
+	const float BaseDeltaTime = 1.0f / 60.0f;
+	int32 TargetUpdatesPerTick = FMath::Clamp(FMath::RoundToInt(BaseDeltaTime / DeltaTime), BaseUpdatesPerTick, MaxUpdatesPerTick);
 
 	// Counter to track the number of updates processed
 	int32 UpdatesProcessedThisTick = 0;
 
-	while (!MeshUpdateQueue.IsEmpty() && UpdatesProcessedThisTick < MaxUpdatesPerTick)
+	while (!MeshUpdateQueue.IsEmpty() && UpdatesProcessedThisTick < TargetUpdatesPerTick)
 	{
 		FQueuedMeshUpdate Update;
 		MeshUpdateQueue.Dequeue(Update);
@@ -545,6 +544,8 @@ void AChunkManager::Tick(float DeltaTime)
 
 		UpdatesProcessedThisTick++;
 	}
+	if (GEngine)
+		GEngine->AddOnScreenDebugMessage(-1, 0.001f, FColor::Yellow, FString::Printf(TEXT("Chunk Per Frame: %d"), TargetUpdatesPerTick));
 }
 
 void AChunkManager::CleanUpCachedData(TSharedPtr<FChunkData> ChunkData)
