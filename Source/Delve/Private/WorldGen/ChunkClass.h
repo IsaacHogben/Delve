@@ -21,7 +21,7 @@
 
 class UProceduralMeshComponent;
 class AChunkManager; // Forward declaration of AChunkManager
-class UProceduralTerrain;
+class AProceduralTerrain;
 
 struct FBlockUpdate;
 struct FCachedBlockUpdate;
@@ -56,8 +56,8 @@ public:
 	AChunkManager* ChunkManager;
 	UPROPERTY()
 	UProceduralMeshComponent* Mesh;
-
-	UProceduralTerrain* TerrainGenerator;
+	UPROPERTY()
+	AProceduralTerrain* TerrainGenerator;
 	TSharedPtr<FChunkData> ChunkData;
 
 	//Variables

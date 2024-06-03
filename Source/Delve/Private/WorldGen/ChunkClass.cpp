@@ -175,7 +175,19 @@ void UChunkClass::AGenerateMesh()
 					const bool CurrentBlockOpaque = CurrentBlock != EBlock::Air;
 					const bool CompareBlockOpaque = CompareBlock != EBlock::Air;
 
-					if (CurrentBlockOpaque == CompareBlockOpaque)
+					if (CurrentBlock == EBlock::Leaves && CompareBlock == EBlock::Leaves)
+					{
+						Mask[N++] = FMask{ CurrentBlock, 2 };
+					}
+					else if (CurrentBlock == EBlock::Leaves && CompareBlockOpaque)
+					{
+						Mask[N++] = FMask{ CompareBlock, -1 };
+					}
+					else if (CompareBlock == EBlock::Leaves && CurrentBlockOpaque)
+					{
+						Mask[N++] = FMask{ CurrentBlock, 1 };
+					}
+					else if (CurrentBlockOpaque == CompareBlockOpaque)
 					{
 						Mask[N++] = FMask{ EBlock::Null, 0 };
 					}
@@ -199,8 +211,8 @@ void UChunkClass::AGenerateMesh()
 				for (int i = 0; i < Axis1Limit;)
 				{
 					// Bypass faces not facing us
-					const auto Normal = FIntVector(AxisMask * Mask[N].Normal);
-					if (Mask[N].Normal != 0 && (CompareNormalMask(Normal)))
+					//const auto Normal = FIntVector(AxisMask * Mask[N].Normal);
+					if (Mask[N].Normal != 0)
 					{
 						const auto CurrentMask = Mask[N];
 						ChunkItr[Axis1] = i;
@@ -231,13 +243,32 @@ void UChunkClass::AGenerateMesh()
 						DeltaAxis1[Axis1] = Width;
 						DeltaAxis2[Axis2] = Height;
 
-						CreateQuad(
-							CurrentMask, AxisMask, Width, Height,
-							FVector(ChunkItr),
-							FVector(ChunkItr + DeltaAxis1),
-							FVector(ChunkItr + DeltaAxis2),
-							FVector(ChunkItr + DeltaAxis1 + DeltaAxis2)
-						);
+						// Normal of Two means two sided mesh
+						if (CurrentMask.Normal == 2)
+						{
+							CreateQuad(
+								FMask(CurrentMask.Block, 1), AxisMask, Width, Height,
+								FVector(ChunkItr),
+								FVector(ChunkItr + DeltaAxis1),
+								FVector(ChunkItr + DeltaAxis2),
+								FVector(ChunkItr + DeltaAxis1 + DeltaAxis2)
+							);
+							CreateQuad(
+								FMask(CurrentMask.Block, -1), AxisMask, Width, Height,
+								FVector(ChunkItr),
+								FVector(ChunkItr + DeltaAxis1),
+								FVector(ChunkItr + DeltaAxis2),
+								FVector(ChunkItr + DeltaAxis1 + DeltaAxis2)
+							);
+						}
+						else
+							CreateQuad(
+								CurrentMask, AxisMask, Width, Height,
+								FVector(ChunkItr),
+								FVector(ChunkItr + DeltaAxis1),
+								FVector(ChunkItr + DeltaAxis2),
+								FVector(ChunkItr + DeltaAxis1 + DeltaAxis2)
+							);
 
 						DeltaAxis1 = FIntVector::ZeroValue;
 						DeltaAxis2 = FIntVector::ZeroValue;
@@ -395,7 +426,8 @@ void UChunkClass::GenerateProceduralTerrain()
 	ChunkData->Blocks.SetNum((ChunkSize) * (ChunkSize) * (ChunkSize));
 	TArray<FCachedBlockUpdate> DecoBlockUpdates = TerrainGenerator->GetGeneratedChunk(ChunkWorldPosition, ChunkData->Position, ChunkData->Blocks, IsChunkEmpty);
 
-	ModifyVoxels(DecoBlockUpdates, false);
+	if (DecoBlockUpdates.Num() > 0)
+		ModifyVoxels(DecoBlockUpdates, false);
 }
 
 EBlock UChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)

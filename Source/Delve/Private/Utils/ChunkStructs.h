@@ -2,7 +2,6 @@
 
 #include "CoreMinimal.h"
 #include "../WorldGen/ChunkClass.h"
-#include "../WorldGen/Octree.h"
 #include "FastNoiseLite.h"
 
 #include "ChunkStructs.Generated.h"
@@ -80,7 +79,7 @@ public:
 	}
 	~FChunkData()
 	{
-		UE_LOG(LogTemp, Error, TEXT("FChunkData Deconstructor Called!"));
+		//UE_LOG(LogTemp, Error, TEXT("FChunkData Deconstructor Called!"));
 	}
 
 	bool operator<(const FChunkData& Other) const

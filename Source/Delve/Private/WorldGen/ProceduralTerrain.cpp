@@ -4,13 +4,26 @@
 #include "WorldGen/ProceduralTerrain.h"
 #include "NoiseManager.h"
 
-UProceduralTerrain::UProceduralTerrain()
+AProceduralTerrain::AProceduralTerrain()
 {
+	UE_LOG(LogTemp, Warning, TEXT("ProceduralTerrain Constructor Called"));
+	//PrimaryActorTick.bCanEverTick = true;
 }
 
-UProceduralTerrain::~UProceduralTerrain()
+AProceduralTerrain::~AProceduralTerrain()
 {
 	UE_LOG(LogTemp, Warning, TEXT("ProceduralTerrain Deconstructor called"));
+}
+
+// Called when the game starts or when spawned
+void AProceduralTerrain::Initialize()
+{
+	UE_LOG(LogTemp, Warning, TEXT("BeginPlay called in ProceduralTerrain"));
+	N = NewObject<UNoiseManager>();
+	N->InitializeArray(GenerationNoiseArray);
+	// Initialize regions
+	BaseRegion = NewObject<UBaseRegion>();
+	CliffRegion = NewObject<UCliffRegion>();
 }
 
 int QuantizeCoordinate(int value, int quantizationStep)
@@ -33,7 +46,7 @@ float GetQuantizedNoise(int x, int y, int z, FastNoiseLite* Noise)
 	return Noise->GetNoise(float(x), float(y), quantizedZ);
 }
 
-int UProceduralTerrain::GetBlockIndex(int X, int Y, int Z)
+int AProceduralTerrain::GetBlockIndex(int X, int Y, int Z)
 {
 	int IndexSize = 262144;
 	int r = Z * ChunkSize * ChunkSize + Y * ChunkSize + X;
@@ -42,66 +55,97 @@ int UProceduralTerrain::GetBlockIndex(int X, int Y, int Z)
 	return r;
 }
 
-float UProceduralTerrain::GetNoiseLevelOne(float x, float y, float z)
+bool AProceduralTerrain::IsInLocalRegion(FastNoiseLite* RegionNoise, float RegionSize, float& x, float& y, float& z)
 {
-	float CliffRegion = N->CliffNoise->GetNoise(x, y, z);
+	float Region = RegionNoise->GetNoise(x, y, z);
 
-	if (CliffRegion < -0.88)
-		z = QuantizeCoordinate(z, (((N->BaseNoise->GetNoise(0.0f, 0.0f, z)/2) + 1) * 8) - 3);//extra math not doing much atm
-
-	return N->BaseNoise->GetNoise(x, y, z);
+	if (Region < RegionSize)
+		return true;
+	return false;
 }
 
-EBlock UProceduralTerrain::GetTerrainLevelOne(float x, float y, float z)
+EBlock AProceduralTerrain::GetBlockFromRegion(ULocalRegion* LocalRegion, ESoilLayer SoilLayer)
 {
-	//NoiseTest
-	float CliffRegion = N->CliffNoise->GetNoise(x, y, z);
+	switch (SoilLayer) {
+	case ESoilLayer::Topsoil:
+		return LocalRegion->Topsoil;
+	case ESoilLayer::Subsoil:
+		return LocalRegion->Subsoil;
+	case ESoilLayer::Bedrock:
+		return LocalRegion->Bedrock;
+	}
+
+	return EBlock::Null;
+}
+
+EBlock AProceduralTerrain::GetTerrainLevelOne(float x, float y, float z, EBlock AboveBlock)
+{
+	ESoilLayer SoilLayer = ESoilLayer::Bedrock;
+	ULocalRegion* LocalRegion = BaseRegion;
+
+	if (CliffRegion->IsInRegion(x,y,z))
+	{
+		float CliffNoiseValue = N->BaseNoise->GetNoise(0.0f, 0.0f, z * 15);
+		int QuantizationLevel = FMath::Clamp(FMath::RoundToInt(CliffNoiseValue * 26), 6, 20); // Dynamic quantization
+		z = FMath::FloorToInt(z / QuantizationLevel) * QuantizationLevel + 2;
+		LocalRegion = CliffRegion;
+	}
 
 	const auto SurfaceValue = 0;
-	const auto Value = GetNoiseLevelOne(x, y, z);
-	const auto UpValue = GetNoiseLevelOne(x, y, z + 1);
+	const auto Value = N->BaseNoise->GetNoise(x, y, z);
+	const auto UpValue = N->BaseNoise->GetNoise(x, y, z+1);
 
-	const float Density = 0;
+	const float Density = ZDensityCurve->GetFloatValue(z);
+	const float UpDensity = ZDensityCurve->GetFloatValue(z+1);
 
-	if (Value >= Density || z + (32 * SurfaceValue) > 0)
-	{
+
+	if (IsAir(Value, Density))
 		return EBlock::Air;
-	}
-	else //Not Air
+	if (LocalRegion == CliffRegion)
 	{
-		if (UpValue >= Density)
-			return EBlock::Grass;
-		if (UpValue > Value)
-		{ 
-			if (Value >= (Density - 0.0024f))
-				return EBlock::Grass;
-			if (Value >= (Density - 0.016f))
-				return EBlock::Dirt;
-		}
-		return EBlock::Stone;
+		if (AboveBlock == EBlock::Air)
+			return GetBlockFromRegion(CliffRegion, ESoilLayer::Topsoil);
+		else if (AboveBlock != EBlock::Null)
+			return GetBlockFromRegion(CliffRegion, ESoilLayer::Bedrock);
 	}
+	else if (UpValue >= UpDensity)
+		SoilLayer = ESoilLayer::Topsoil;
+	else if (UpValue > Value)
+	{
+		if (Value >= (Density - 0.0024f))
+			SoilLayer = ESoilLayer::Topsoil;
+		else if (Value >= (Density - 0.019f))
+			SoilLayer = ESoilLayer::Subsoil;
+	}
+
+	return GetBlockFromRegion(LocalRegion, SoilLayer);
 }
 
 
 //Generates first layer terrain and returns FBulkBlockUpdate for additional levels of modification.
-TArray<FCachedBlockUpdate> UProceduralTerrain::GetGeneratedChunk(FVector ChunkPosition, FIntVector ChunkVectorPosition, TArray<EBlock>& BlockArray, bool& IsChunkEmpty)
+TArray<FCachedBlockUpdate> AProceduralTerrain::GetGeneratedChunk(FVector ChunkPosition, FIntVector ChunkVectorPosition, TArray<EBlock>& BlockArray, bool& IsChunkEmpty)
 {
 	TArray<FCachedBlockUpdate> BlockUpdates;
 	IsChunkEmpty = false; //WILL NEVER TRIGER! TODO
 	EBlock Block;
+	EBlock AboveBlock = EBlock::Null;
 	for (int x = 0; x < ChunkSize; ++x)
 	{
 		for (int y = 0; y < ChunkSize; ++y)
 		{
-			for (int z = 0; z < ChunkSize ; ++z)
+			for (int z = ChunkSize; z >= 0 ; --z)
 			{
-				Block = GetTerrainLevelOne(x + ChunkPosition.X, y + ChunkPosition.Y, z + ChunkPosition.Z);
+				if (AboveBlock == EBlock::Null)
+					AboveBlock = GetTerrainLevelOne(x + ChunkPosition.X, y + ChunkPosition.Y, z + ChunkPosition.Z + 1, EBlock::Null);
+				Block = GetTerrainLevelOne(x + ChunkPosition.X, y + ChunkPosition.Y, z + ChunkPosition.Z, AboveBlock);
+				AboveBlock = Block;
+				//UE_LOG(LogTemp, Warning, TEXT("block %d"), Block);
 				BlockArray[GetBlockIndex(x, y, z)] = Block;
 				if (Block != EBlock::Air)
 					IsChunkEmpty = false;
 				if (Block == EBlock::Grass)
 				{
-					if (FMath::RandRange(0, 256) == 0)
+					if (FMath::RandRange(0, 512) == 0)
 						MakeTestTree(BlockUpdates, 15, x, y, z);
 				}
 			}
@@ -114,21 +158,21 @@ TArray<FCachedBlockUpdate> UProceduralTerrain::GetGeneratedChunk(FVector ChunkPo
 	return BlockUpdates;
 }
 
-bool UProceduralTerrain::IsSurfaceBlock(float UpValue, float Density)
+bool AProceduralTerrain::IsSurfaceBlock(float UpValue, float Density)
 {
 	if (IsAir(UpValue, Density))
 		return true;
 	return false;
 }
 
-bool UProceduralTerrain::IsAir(float Value, float Density)
+bool AProceduralTerrain::IsAir(float Value, float Density)
 {
 	if (Value >= Density)
 		return true;
 	return false;
 }
 
-void UProceduralTerrain::AddReferencelessDecorations(TArray<EBlock>& BlockArray, FastNoiseLite* Noise, TArray<FCachedBlockUpdate>& BlockUpdates)
+void AProceduralTerrain::AddReferencelessDecorations(TArray<EBlock>& BlockArray, FastNoiseLite* Noise, TArray<FCachedBlockUpdate>& BlockUpdates)
 {
 	EBlock Block;
 	for (int x = 0; x < ChunkSize + 2; ++x)
@@ -154,7 +198,7 @@ void UProceduralTerrain::AddReferencelessDecorations(TArray<EBlock>& BlockArray,
 	}
 }
 
-void UProceduralTerrain::MakeTestShape(TArray<FCachedBlockUpdate>& BlockUpdates, int x, int y, int z)
+void AProceduralTerrain::MakeTestShape(TArray<FCachedBlockUpdate>& BlockUpdates, int x, int y, int z)
 {
 	//BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y, z), EBlock::Stone));
 	//int r = 44;
@@ -175,7 +219,7 @@ void UProceduralTerrain::MakeTestShape(TArray<FCachedBlockUpdate>& BlockUpdates,
 	}
 }
 
-void UProceduralTerrain::MakeTestTree(TArray<FCachedBlockUpdate>& BlockUpdates, int height, int x, int y, int z)
+void AProceduralTerrain::MakeTestTree(TArray<FCachedBlockUpdate>& BlockUpdates, int height, int x, int y, int z)
 {
 	//BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y, z), EBlock::Stone));
 	//int r = 44;
@@ -186,7 +230,7 @@ void UProceduralTerrain::MakeTestTree(TArray<FCachedBlockUpdate>& BlockUpdates, 
 	AddSphere(BlockUpdates, 6, x, y, z + height, EBlock::Leaves);
 }
 
-void UProceduralTerrain::AddCylinder(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int height, int centerX, int centerY, int baseZ, EBlock blockType)
+void AProceduralTerrain::AddCylinder(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int height, int centerX, int centerY, int baseZ, EBlock blockType)
 {
 	for (int z = 0; z < height; ++z)
 	{
@@ -203,7 +247,7 @@ void UProceduralTerrain::AddCylinder(TArray<FCachedBlockUpdate>& BlockUpdates, i
 	}
 }
 
-void UProceduralTerrain::AddSphere(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int centerX, int centerY, int centerZ, EBlock blockType)
+void AProceduralTerrain::AddSphere(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int centerX, int centerY, int centerZ, EBlock blockType)
 {
 	for (int x = -radius; x <= radius; ++x)
 	{

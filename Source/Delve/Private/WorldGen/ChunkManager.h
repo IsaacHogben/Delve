@@ -16,7 +16,7 @@
 
 class UChunkClass;
 class UNoiseManager;
-class UProceduralTerrain;
+class AProceduralTerrain;
 struct FChunkData;
 struct FBlockUpdate;
 struct FCachedBlockUpdate;
@@ -45,10 +45,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Generation Settings")
 	TArray<FFastNoise> GenerationNoiseArray;
 
+	UPROPERTY(EditAnywhere, Category = "Generation Settings")
+	TObjectPtr<AProceduralTerrain> TerrainGenerator;
+
 	UPROPERTY(EditAnywhere, Category = "Material Settings")
 	TObjectPtr<UMaterialInterface> Material;
-
-	
 
 	UProceduralMeshComponent* CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod);
 
@@ -73,8 +74,6 @@ protected:
 private:
 	UPROPERTY()
 	UNoiseManager* NoiseManager;
-	UPROPERTY()
-	UProceduralTerrain* TerrainGenerator;
 
 	int TotalChunks;
 	int ChunkGenerationLayersExpected[3]; //use array when more layers are nescessary.

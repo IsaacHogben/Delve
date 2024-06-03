@@ -7,6 +7,9 @@
 #include "../Utils/FastNoiseLite.h"
 #include "../Utils/ChunkStructs.h"
 
+#include "GenClasses/Truce/BaseRegion.h"
+#include "GenClasses/Truce/CliffRegion.h"
+
 #include "ProceduralTerrain.generated.h"
 
 class UNoiseManager;
@@ -15,27 +18,40 @@ struct FFastNoise;
 /**
  * 
  */
+
 UCLASS()
-class UProceduralTerrain : public UObject
+class AProceduralTerrain : public AActor
 {
 	GENERATED_BODY()
 
 public:
-	UProceduralTerrain();
-	~UProceduralTerrain();
+	AProceduralTerrain();
+	~AProceduralTerrain();
+	void Initialize();
 	UPROPERTY()
 	UNoiseManager* N;
 
+	UPROPERTY(EditAnywhere, Category = "Generation Settings")
+	TArray<FFastNoise> GenerationNoiseArray;
+
+	// The reference to the curve asset
+	UPROPERTY(EditAnywhere, Category = "Curves")
+	UCurveFloat* ZDensityCurve;
+
 	int ChunkSize = 64;
-
 	int GetBlockIndex(int X, int Y, int Z);
-
 	
 	TArray<FCachedBlockUpdate> GetGeneratedChunk(FVector ChunkPosition, FIntVector ChunkVectorPosition, TArray<EBlock>& BlockArray, bool& isChunkEmpty);
-	
+
+protected:
+
+
 private:
-	EBlock GetTerrainLevelOne(float x, float y, float z);
+	EBlock GetTerrainLevelOne(float x, float y, float z, EBlock AboveBlock);
 	float GetNoiseLevelOne(float x, float y, float z);
+
+	bool IsInLocalRegion(FastNoiseLite* Region, float RegionSize, float& x, float& y, float& z);
+	EBlock GetBlockFromRegion(ULocalRegion* LocalRegion, ESoilLayer SoilLayer);
 
 	bool IsSurfaceBlock(float AboveValue, float Density);
 	bool IsAir(float Value, float Density);
@@ -46,6 +62,13 @@ private:
 	void MakeTestTree(TArray<FCachedBlockUpdate>& BlockUpdates, int height, int x, int y, int z);
 	void AddCylinder(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int height, int centerX, int centerY, int baseZ, EBlock blockType);
 	void AddSphere(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int centerX, int centerY, int centerZ, EBlock blockType);
+
+	//Local Regions
+	UPROPERTY(EditAnywhere, Category = "Terrain")
+	class UBaseRegion* BaseRegion;
+	UPROPERTY(EditAnywhere, Category = "Terrain")
+	class UCliffRegion* CliffRegion;
+
 };
 
 int QuantizeCoordinate(int value, int quantizationStep);

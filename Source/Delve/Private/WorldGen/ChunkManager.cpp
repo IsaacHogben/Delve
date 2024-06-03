@@ -29,11 +29,7 @@ void AChunkManager::BeginPlay()
 {
 	Super::BeginPlay();
 	//Setup
-	NoiseManager = NewObject<UNoiseManager>();
-	NoiseManager->InitializeArray(GenerationNoiseArray);
-	TerrainGenerator = NewObject <UProceduralTerrain>();
-	TerrainGenerator->N = NoiseManager;
-
+	TerrainGenerator->Initialize();
 	GenerateChunks(PreviousPlayerChunkPosition);
 	UpdateChunkGenerationLayerStatus();
 }
@@ -524,8 +520,8 @@ void AChunkManager::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	// Define the base and maximum updates per tick
-	const int BaseUpdatesPerTick = 4;
-	const int MaxUpdatesPerTick = 32; // Maximum updates to allow per frame
+	const int BaseUpdatesPerTick = 0;
+	const int MaxUpdatesPerTick = 3; // Maximum updates to allow per frame
 
 	// Calculate target updates per tick based on DeltaTime
 	// Assuming a base frame rate of 60 FPS for reference

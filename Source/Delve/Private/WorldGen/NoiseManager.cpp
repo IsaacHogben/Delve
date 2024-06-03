@@ -10,8 +10,12 @@ UNoiseManager::~UNoiseManager()
 
 void UNoiseManager::InitializeArray(TArray<FFastNoise> NoiseArray)
 {
-	BaseNoise = InitializeNoise(NoiseArray[0]);
-	CliffNoise = InitializeNoise(NoiseArray[1]);
+	UE_LOG(LogTemp, Warning, TEXT("NoiseArray.Num() == %d"), NoiseArray.Num());
+	if (NoiseArray.Num() == 2)
+	{
+		BaseNoise = InitializeNoise(NoiseArray[0]);
+		CliffNoise = InitializeNoise(NoiseArray[1]);
+	}
 }
 
 FastNoiseLite* UNoiseManager::InitializeNoise(FFastNoise& NoiseSettings)

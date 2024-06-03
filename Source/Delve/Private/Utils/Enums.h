@@ -13,6 +13,18 @@ enum class EBlock : uint8
 };
 
 UENUM(BlueprintType)
+enum class ELocalRegion : uint8
+{
+	Base, Cliffs
+};
+
+UENUM(BlueprintType)
+enum class ESoilLayer : uint8
+{
+	Topsoil, Subsoil, Bedrock
+};
+
+UENUM(BlueprintType)
 enum class ECompletedGenerationLayer : uint8
 {
 	Empty,
