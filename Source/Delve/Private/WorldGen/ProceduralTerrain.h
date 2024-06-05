@@ -59,7 +59,7 @@ private:
 	void AddReferencelessDecorations(TArray<EBlock>& BlockArray, FastNoiseLite* Noise, TArray<FCachedBlockUpdate>&
 		BlockUpdates);
 	void MakeTestShape(TArray<FCachedBlockUpdate>& BlockUpdates, int x, int y, int z);
-	void MakeTestTree(TArray<FCachedBlockUpdate>& BlockUpdates, int height, int x, int y, int z);
+	void MakeTestTree(TArray<FCachedBlockUpdate>& BlockUpdates, int x, int y, int z);
 	void AddCylinder(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int height, int centerX, int centerY, int baseZ, EBlock blockType);
 	void AddSphere(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int centerX, int centerY, int centerZ, EBlock blockType);
 

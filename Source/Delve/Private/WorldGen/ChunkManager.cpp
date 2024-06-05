@@ -255,7 +255,7 @@ void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMesh
 	}
 	else //Properties for LOD 1 and 2
 	{
-		Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		Mesh->SetCastShadow(false);
 	}
 	Mesh->CreateMeshSection( //EXCEPTION_ACCESS_VIOLATION reading address 11

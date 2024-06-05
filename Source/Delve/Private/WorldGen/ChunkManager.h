@@ -43,9 +43,6 @@ public:
 	int RenderDistance = 1;
 
 	UPROPERTY(EditAnywhere, Category = "Generation Settings")
-	TArray<FFastNoise> GenerationNoiseArray;
-
-	UPROPERTY(EditAnywhere, Category = "Generation Settings")
 	TObjectPtr<AProceduralTerrain> TerrainGenerator;
 
 	UPROPERTY(EditAnywhere, Category = "Material Settings")

@@ -457,18 +457,19 @@ EBlock UChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
 
 int UChunkClass::GetTextureIndex(EBlock Block, FVector Normal) const
 {
-	switch (Block) {
-	case EBlock::Grass:
-	{
-		//if (Normal == FVector::UpVector) return 0; how to have different faces on one block
-		return 0;
-	}
-	case EBlock::Dirt: return 2;
-	case EBlock::Stone: return 1;
-	case EBlock::Leaves: return 3;
-	case EBlock::Null: return 4;
-	default: return 255;
-	}
+	return static_cast<int>(Block);
+	//switch (Block) {
+	//case EBlock::Grass:
+	//{
+	//	//if (Normal == FVector::UpVector) return 0; how to have different faces on one block
+	//	return 0;
+	//}
+	//case EBlock::Dirt: return 2;
+	//case EBlock::Stone: return 1;
+	//case EBlock::Leaves: return 3;
+	//case EBlock::Null: return 4;
+	//default: return 255;
+	//}
 }
 
 void UChunkClass::ModifyVoxelData(const FIntVector Position, const EBlock Block)
@@ -499,14 +500,17 @@ FIntVector UChunkClass::GetBlockChunkAndIndex(FIntVector& Index)
 	return RedirectChunk;
 }
 
-//
-FIntVector UChunkClass::ModifyVoxel(FIntVector& Position, const EBlock& Block, bool RegenerateMesh)
+// bool OnlyReplaceAir can be changes to enums later for more modify voxel options
+FIntVector UChunkClass::ModifyVoxel(FIntVector& Position, const EBlock& Block, bool RegenerateMesh, bool OnlyReplaceAir)
 {
 	FIntVector RedirectChunk = GetBlockChunkAndIndex(Position);
 
 	if (RedirectChunk == ChunkData->Position)
 	{
-		ModifyVoxelData(Position, Block);
+		if (OnlyReplaceAir && GetBlock(Position, false) == EBlock::Air)
+			ModifyVoxelData(Position, Block);
+		else if (!OnlyReplaceAir)
+			ModifyVoxelData(Position, Block);
 		if (RegenerateMesh)
 		{
 			ApplyMesh();
@@ -522,7 +526,7 @@ void UChunkClass::ModifyVoxels(TArray<FCachedBlockUpdate>& BlockUpdates, bool Re
 	FIntVector RedirectChunk;
 	for (int i = 0; i < BlockUpdates.Num(); i++)//not seeing any changes from the second update
 	{
-		RedirectChunk = ModifyVoxel(BlockUpdates[i].Position, BlockUpdates[i].Block, false);
+		RedirectChunk = ModifyVoxel(BlockUpdates[i].Position, BlockUpdates[i].Block, false, true);
 		if (RedirectChunk != ChunkData->Position)
 		{
 			RedirectBlockUpdates.Add(FBlockUpdate(RedirectChunk, BlockUpdates[i].Position, BlockUpdates[i].Block));

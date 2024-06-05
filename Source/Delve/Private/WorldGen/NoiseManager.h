@@ -107,6 +107,8 @@ public:
 	UPROPERTY(EditAnywhere, Category = "FastNoise", meta = (EditCondition = "DomainWarpType != EDomainWarpType::DomainWarpType_None", EditConditionHides))
 	float DomainWarpAmplitude = 1;
 
+	UPROPERTY(EditAnywhere, Category = "FastNoise", meta = (EditCondition = "DomainWarpType != EDomainWarpType::DomainWarpType_None", EditConditionHides))
+	float DomainWarpFrequency = 0.1;
 };
 
 UCLASS()
@@ -122,5 +124,6 @@ public:
 
 	// Noise for level 1
 	FastNoiseLite* BaseNoise;
-	FastNoiseLite* CliffNoise;
+	FastNoiseLite* WorldHeightCellNoise;
+	FastNoiseLite* WorldHeightCellDensityNoise;
 };

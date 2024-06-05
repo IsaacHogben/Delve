@@ -55,15 +55,6 @@ int AProceduralTerrain::GetBlockIndex(int X, int Y, int Z)
 	return r;
 }
 
-bool AProceduralTerrain::IsInLocalRegion(FastNoiseLite* RegionNoise, float RegionSize, float& x, float& y, float& z)
-{
-	float Region = RegionNoise->GetNoise(x, y, z);
-
-	if (Region < RegionSize)
-		return true;
-	return false;
-}
-
 EBlock AProceduralTerrain::GetBlockFromRegion(ULocalRegion* LocalRegion, ESoilLayer SoilLayer)
 {
 	switch (SoilLayer) {
@@ -85,19 +76,35 @@ EBlock AProceduralTerrain::GetTerrainLevelOne(float x, float y, float z, EBlock 
 
 	if (CliffRegion->IsInRegion(x,y,z))
 	{
-		float CliffNoiseValue = N->BaseNoise->GetNoise(0.0f, 0.0f, z * 15);
+		float CliffNoiseValue = N->BaseNoise->GetNoise(x, z * 30);
 		int QuantizationLevel = FMath::Clamp(FMath::RoundToInt(CliffNoiseValue * 26), 6, 20); // Dynamic quantization
 		z = FMath::FloorToInt(z / QuantizationLevel) * QuantizationLevel + 2;
 		LocalRegion = CliffRegion;
 	}
 
-	const auto SurfaceValue = 0;
-	const auto Value = N->BaseNoise->GetNoise(x, y, z);
-	const auto UpValue = N->BaseNoise->GetNoise(x, y, z+1);
+	const auto Value = N->BaseNoise->GetNoise(x, y, z * 1);
+	const auto UpValue = N->BaseNoise->GetNoise(x, y, (z+1) * 1);
 
-	const float Density = ZDensityCurve->GetFloatValue(z);
-	const float UpDensity = ZDensityCurve->GetFloatValue(z+1);
-
+	// Makes different heights at top
+	float WorldCellHeight = FMath::Clamp(FMath::RoundToInt(N->WorldHeightCellNoise->GetNoise(x, y) * 100), 0, 248);
+	float WorldHieghtCellDensityModifier = 0;
+	float Density = ZDensityCurve->GetFloatValue(z);
+	float UpDensity = ZDensityCurve->GetFloatValue(z+1);
+	
+	if (z > 0 && z < WorldCellHeight) //use Density modifier as mask and add cell height after!!!!!!--------
+	{	
+		float PillarDensity = 0;
+		//int PillarTransitionHeight = 8;
+		//if (z < PillarTransitionHeight)
+			//PillarDensity = FMath::Lerp(1, PillarDensity, z / PillarTransitionHeight);
+		WorldHieghtCellDensityModifier = N->WorldHeightCellDensityNoise->GetNoise(x, y);
+		if (WorldHieghtCellDensityModifier > 0)
+		{
+			WorldHieghtCellDensityModifier = WorldHieghtCellDensityModifier / 2 + 0.5;
+			Density = FMath::Lerp(Density, PillarDensity, WorldHieghtCellDensityModifier);
+			UpDensity = FMath::Lerp(UpDensity, PillarDensity, WorldHieghtCellDensityModifier);
+		}
+	}
 
 	if (IsAir(Value, Density))
 		return EBlock::Air;
@@ -110,11 +117,9 @@ EBlock AProceduralTerrain::GetTerrainLevelOne(float x, float y, float z, EBlock 
 	}
 	else if (UpValue >= UpDensity)
 		SoilLayer = ESoilLayer::Topsoil;
-	else if (UpValue > Value)
+	else if (UpValue > Value) //In Top half of terrain
 	{
-		if (Value >= (Density - 0.0024f))
-			SoilLayer = ESoilLayer::Topsoil;
-		else if (Value >= (Density - 0.019f))
+		if (Value >= (Density - 0.022f))
 			SoilLayer = ESoilLayer::Subsoil;
 	}
 
@@ -133,20 +138,32 @@ TArray<FCachedBlockUpdate> AProceduralTerrain::GetGeneratedChunk(FVector ChunkPo
 	{
 		for (int y = 0; y < ChunkSize; ++y)
 		{
-			for (int z = ChunkSize; z >= 0 ; --z)
-			{
-				if (AboveBlock == EBlock::Null)
-					AboveBlock = GetTerrainLevelOne(x + ChunkPosition.X, y + ChunkPosition.Y, z + ChunkPosition.Z + 1, EBlock::Null);
-				Block = GetTerrainLevelOne(x + ChunkPosition.X, y + ChunkPosition.Y, z + ChunkPosition.Z, AboveBlock);
-				AboveBlock = Block;
-				//UE_LOG(LogTemp, Warning, TEXT("block %d"), Block);
-				BlockArray[GetBlockIndex(x, y, z)] = Block;
-				if (Block != EBlock::Air)
-					IsChunkEmpty = false;
-				if (Block == EBlock::Grass)
+			for (int z = ChunkSize - 1; z >= 0 ; --z)
+			{				
+				if (0)// TEST NOISE - Used to test new noise values on there own
 				{
-					if (FMath::RandRange(0, 512) == 0)
-						MakeTestTree(BlockUpdates, 15, x, y, z);
+					float noise = N->BaseNoise->GetNoise(float(x) + ChunkPosition.X, float(y) + ChunkPosition.Y, float(z) + ChunkPosition.Z);
+					if (noise > ZDensityCurve->GetFloatValue(z + ChunkPosition.Z))
+						BlockArray[GetBlockIndex(x, y, z)] = EBlock::Air;
+					else
+						BlockArray[GetBlockIndex(x, y, z)] = EBlock::CliffStone;
+				}
+				else// normal
+				{
+					if (AboveBlock == EBlock::Null)
+						AboveBlock = GetTerrainLevelOne(x + ChunkPosition.X, y + ChunkPosition.Y, z + ChunkPosition.Z + 1, EBlock::Null);
+					Block = GetTerrainLevelOne(x + ChunkPosition.X, y + ChunkPosition.Y, z + ChunkPosition.Z, AboveBlock);
+					AboveBlock = Block;
+
+					BlockArray[GetBlockIndex(x, y, z)] = Block;
+
+					if (Block != EBlock::Air)
+						IsChunkEmpty = false;
+					if (Block == EBlock::Grass || Block == EBlock::Moss)
+					{
+						if (FMath::RandRange(0, 366) == 0)
+							MakeTestTree(BlockUpdates, x, y, z);
+					}
 				}
 			}
 		}
@@ -219,15 +236,18 @@ void AProceduralTerrain::MakeTestShape(TArray<FCachedBlockUpdate>& BlockUpdates,
 	}
 }
 
-void AProceduralTerrain::MakeTestTree(TArray<FCachedBlockUpdate>& BlockUpdates, int height, int x, int y, int z)
+void AProceduralTerrain::MakeTestTree(TArray<FCachedBlockUpdate>& BlockUpdates, int x, int y, int z)
 {
+	int height = FMath::RandRange(6, 14);
+	if (height > 9 && height < 14)
+		height = 6;
 	//BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y, z), EBlock::Stone));
 	//int r = 44;
 	for (int i = 1; i < height; i++)
 	{
 		BlockUpdates.Add(FCachedBlockUpdate(FIntVector(x, y, z + i), EBlock::Dirt));
 	}
-	AddSphere(BlockUpdates, 6, x, y, z + height, EBlock::Leaves);
+	AddSphere(BlockUpdates, FMath::RoundToInt(float(height) / 2), x, y, z + height, EBlock::Leaves);
 }
 
 void AProceduralTerrain::AddCylinder(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int height, int centerX, int centerY, int baseZ, EBlock blockType)

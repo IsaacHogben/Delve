@@ -14,32 +14,32 @@
 UCLASS()
 class UCliffRegion : public ULocalRegion
 {
-	GENERATED_BODY()
-	
+    GENERATED_BODY()
+
 public:
-    FastNoiseLite* CliffNoise;
+    FastNoiseLite* Noise;
 
     UCliffRegion()
     {
-        Topsoil = EBlock::Grass;
+        Topsoil = EBlock::Moss;
         Subsoil = EBlock::Stone;
-        Bedrock = EBlock::Stone;
+        Bedrock = EBlock::CliffStone;
 
-        CliffNoise = new FastNoiseLite();
-        CliffNoise->SetFrequency(0.008);
-        CliffNoise->SetNoiseType(FastNoiseLite::NoiseType_Cellular);
+        Noise = new FastNoiseLite();
+        Noise->SetFrequency(0.008);
+        Noise->SetNoiseType(FastNoiseLite::NoiseType_Cellular);
 
-        CliffNoise->SetFractalType(FastNoiseLite::FractalType_None);
-        CliffNoise->SetFractalOctaves(0);
-        CliffNoise->SetFractalLacunarity(0);
-        CliffNoise->SetFractalGain(0);
+        Noise->SetFractalType(FastNoiseLite::FractalType_FBm);
+        Noise->SetFractalOctaves(2);
+        Noise->SetFractalLacunarity(0.5);
+        Noise->SetFractalGain(2);
 
-        CliffNoise->SetDomainWarpType(FastNoiseLite::DomainWarpType_BasicGrid);
-        CliffNoise->SetDomainWarpAmp(0);
+        Noise->SetDomainWarpType(FastNoiseLite::DomainWarpType_BasicGrid);
+        Noise->SetDomainWarpAmp(0);
 
-        CliffNoise->SetCellularDistanceFunction(FastNoiseLite::CellularDistanceFunction_Euclidean);
-        CliffNoise->SetCellularReturnType(FastNoiseLite::CellularReturnType_Distance2Sub);
-        CliffNoise->SetCellularJitter(1);
+        Noise->SetCellularDistanceFunction(FastNoiseLite::CellularDistanceFunction_Euclidean);
+        Noise->SetCellularReturnType(FastNoiseLite::CellularReturnType_Distance2Sub);
+        Noise->SetCellularJitter(1);
     }
 
     virtual EBlock GetBlock(ESoilLayer SoilLayer) const override
@@ -50,10 +50,18 @@ public:
     virtual bool IsInRegion(float& x, float& y, float& z) const override
     {
         // Specific implementation for Base region
-        if (z > -15)
-            return false;
-        if (CliffNoise->GetNoise(x, y, z) < -0.9f)
-            return true;
+        if (z > RegionEnd && z < RegionStart)
+        {
+            if (Noise->GetNoise(x, y, z) < RegionSize)
+                return true;
+        }
         return false;
     }
+private:
+    // Region start height
+    int RegionStart = -15;
+    int RegionEnd = -310;
+
+    // Portion of the -1 to 1 value that this region occupies
+    float RegionSize = -0.9f;
 };

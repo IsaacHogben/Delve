@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "WorldGen/GenClasses/LocalRegion.h"
-//#include "Utils/Enums.h"
+#include "Utils/FastNoiseLite.h"
 
 #include "BaseRegion.generated.h"
 
@@ -17,8 +17,19 @@ class UBaseRegion : public ULocalRegion
 	GENERATED_BODY()
 	
 public:
+    FastNoiseLite* Noise;
+
     UBaseRegion()
     {
+        Noise = new FastNoiseLite();
+        Noise->SetFrequency(0.04);
+        Noise->SetNoiseType(FastNoiseLite::NoiseType_Perlin);
+
+        Noise->SetFractalType(FastNoiseLite::FractalType_FBm);
+        Noise->SetFractalOctaves(3);
+        Noise->SetFractalGain(2); // Size of subsequent octaves
+        Noise->SetFractalLacunarity(0.5); // Density
+        
     };
 
     virtual EBlock GetBlock(ESoilLayer SoilLayer) const override

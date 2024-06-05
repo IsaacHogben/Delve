@@ -77,7 +77,7 @@ public:
 	TObjectPtr<UMaterialInterface> Material;
 
 	UFUNCTION(BlueprintCallable, Category = "Chunk")
-	FIntVector ModifyVoxel(FIntVector& Position, const EBlock& Block, bool RegenerateMesh);
+	FIntVector ModifyVoxel(FIntVector& Position, const EBlock& Block, bool RegenerateMesh, bool OnlyReplaceAir);
 	void ModifyVoxels(TArray<FCachedBlockUpdate>& BlockUpdates, bool RegenerateMesh);
 
 	void ApplyMesh();
