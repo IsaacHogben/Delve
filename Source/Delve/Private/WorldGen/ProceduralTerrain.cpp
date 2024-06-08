@@ -85,26 +85,41 @@ EBlock AProceduralTerrain::GetTerrainLevelOne(float x, float y, float z, EBlock 
 	const auto Value = N->BaseNoise->GetNoise(x, y, z * 1);
 	const auto UpValue = N->BaseNoise->GetNoise(x, y, (z+1) * 1);
 
-	// Makes different heights at top
-	float WorldCellHeight = FMath::Clamp(FMath::RoundToInt(N->WorldHeightCellNoise->GetNoise(x, y) * 100), 0, 248);
-	float WorldHieghtCellDensityModifier = 0;
+
+
 	float Density = ZDensityCurve->GetFloatValue(z);
-	float UpDensity = ZDensityCurve->GetFloatValue(z+1);
-	
-	if (z > 0 && z < WorldCellHeight) //use Density modifier as mask and add cell height after!!!!!!--------
+	float UpDensity = ZDensityCurve->GetFloatValue(z + 1);
+
+	if (z > 0)
 	{	
-		float PillarDensity = 0;
-		//int PillarTransitionHeight = 8;
-		//if (z < PillarTransitionHeight)
-			//PillarDensity = FMath::Lerp(1, PillarDensity, z / PillarTransitionHeight);
-		WorldHieghtCellDensityModifier = N->WorldHeightCellDensityNoise->GetNoise(x, y);
-		if (WorldHieghtCellDensityModifier > 0)
+		int TransitionHeight = 18;
+		int MaxPillarHeight = 1024;
+		int MinPillarHeight = 0;
+		float PillarDensity = 0.7;
+		float WorldCellHeight = FMath::Clamp(FMath::RoundToInt(N->WorldHeightCellNoise->GetNoise(x, y) * 100), TransitionHeight + MinPillarHeight, MaxPillarHeight);
+
+		float WorldHieghtCellDensity = N->WorldHeightCellDensityNoise->GetNoise(x, y) * -1;// Invert
+		WorldHieghtCellDensity -= PillarDensity;
+
+		if (z < TransitionHeight)
 		{
-			WorldHieghtCellDensityModifier = WorldHieghtCellDensityModifier / 2 + 0.5;
-			Density = FMath::Lerp(Density, PillarDensity, WorldHieghtCellDensityModifier);
-			UpDensity = FMath::Lerp(UpDensity, PillarDensity, WorldHieghtCellDensityModifier);
+			Density = FMath::Lerp(0, WorldHieghtCellDensity, z / TransitionHeight);
+			UpDensity = FMath::Lerp(0, WorldHieghtCellDensity, (z + 1) / TransitionHeight);
 		}
+		else if (z < WorldCellHeight)
+		{
+			Density = WorldHieghtCellDensity;
+			UpDensity = WorldHieghtCellDensity;
+		}
+		if (z > WorldCellHeight)
+		{
+			Density = -1;
+			UpDensity = -1.1;
+		}
+
+		//WorldHieghtCellDensityModifier = FMath::Clamp(FMath::Square(WorldHieghtCellDensityModifier), 0, 1);	
 	}
+	
 
 	if (IsAir(Value, Density))
 		return EBlock::Air;
@@ -238,9 +253,9 @@ void AProceduralTerrain::MakeTestShape(TArray<FCachedBlockUpdate>& BlockUpdates,
 
 void AProceduralTerrain::MakeTestTree(TArray<FCachedBlockUpdate>& BlockUpdates, int x, int y, int z)
 {
-	int height = FMath::RandRange(6, 14);
+	int height = FMath::RandRange(8, 14);
 	if (height > 9 && height < 14)
-		height = 6;
+		height = 8;
 	//BlockUpdates.Add(FBlockUpdate(FIntVector::ZeroValue, FIntVector::ZeroValue, FIntVector(x, y, z), EBlock::Stone));
 	//int r = 44;
 	for (int i = 1; i < height; i++)

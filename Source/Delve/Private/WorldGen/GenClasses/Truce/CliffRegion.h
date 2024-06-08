@@ -60,7 +60,7 @@ public:
 private:
     // Region start height
     int RegionStart = -15;
-    int RegionEnd = -310;
+    int RegionEnd = -304;
 
     // Portion of the -1 to 1 value that this region occupies
     float RegionSize = -0.9f;
