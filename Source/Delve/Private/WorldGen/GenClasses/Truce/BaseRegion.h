@@ -21,8 +21,8 @@ public:
 
     UBaseRegion()
     {
-        Noise = new FastNoiseLite();
-        Noise->SetFrequency(0.04);
+        Noise = new FastNoiseLite(Seed);
+        Noise->SetFrequency(0.05);
         Noise->SetNoiseType(FastNoiseLite::NoiseType_Perlin);
 
         Noise->SetFractalType(FastNoiseLite::FractalType_FBm);
@@ -38,7 +38,7 @@ public:
 
         return EBlock::Null;
     }
-    virtual bool IsInRegion(float& x, float& y, float& z) const override
+    bool IsInRegion(float& x, float& y, float& z) const
     {
         // Specific implementation for Base region
 

@@ -42,6 +42,34 @@ TArray<FChunkData> ChunkRenderDistance::CalculateRenderSphere()
 	return dataArray;
 }
 
+TArray<FChunkData> ChunkRenderDistance::CalculateRenderDisk()
+{
+	TArray<FChunkData> chunkSpawnData;
+
+	FVector PlayerPosition = FVector(0, 0, 0);
+	TArray<FChunkData> dataArray;
+
+	for (int z = 1; z >= -7; z--)
+	{
+		for (int x = -MaxRenderDistance; x <= MaxRenderDistance; x++)
+		{
+			for (int y = -MaxRenderDistance; y <= MaxRenderDistance; y++)
+			{
+				float distance = FVectorDistance(FVector(PlayerPosition.X, PlayerPosition.Y, 0), FVector(x, y, 0));
+				if (distance <= MaxRenderDistance)
+				{
+					FChunkData data;
+					data.Position = FIntVector(x, y, z);
+					data.Lod = 1;
+					dataArray.Add(data);
+				}
+			}
+		}
+	}
+	dataArray.Sort();
+	return dataArray;
+}
+
 //Calculates Lod for a chunk, based on a chunks vector distance from player
 int ChunkRenderDistance::CalculateLod(float Distance)
 {

@@ -37,7 +37,10 @@ public:
 	// The reference to the curve asset
 	UPROPERTY(EditAnywhere, Category = "Curves")
 	UCurveFloat* ZDensityCurve;
+	UPROPERTY(EditAnywhere, Category = "Curves")
+	UCurveFloat* WorldEdgeDensityCurve;
 
+	FIntVector2 WorldCenter = FIntVector2(0, 0);
 	int ChunkSize = 64;
 	int GetBlockIndex(int X, int Y, int Z);
 	
@@ -64,10 +67,12 @@ private:
 	void AddSphere(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int centerX, int centerY, int centerZ, EBlock blockType);
 
 	//Local Regions
-	UPROPERTY(EditAnywhere, Category = "Terrain")
+	UPROPERTY()
 	class UBaseRegion* BaseRegion;
-	UPROPERTY(EditAnywhere, Category = "Terrain")
+	UPROPERTY()
 	class UCliffRegion* CliffRegion;
+	UPROPERTY()
+	class UTopRegion* TopRegion;
 
 };
 

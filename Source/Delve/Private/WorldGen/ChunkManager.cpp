@@ -30,13 +30,15 @@ void AChunkManager::BeginPlay()
 	Super::BeginPlay();
 	//Setup
 	TerrainGenerator->Initialize();
+	//ChunkLoadTest();
 	GenerateChunks(PreviousPlayerChunkPosition);
 	UpdateChunkGenerationLayerStatus();
 }
 
 void AChunkManager::UpdatePlayerChunkPosition(const FVector& PlayerPosition)
 {
-	UpdatePlayerChunkPositionAsync(PlayerPosition);
+	//UpdatePlayerChunkPositionAsync(PlayerPosition);
+
 }
 
 void AChunkManager::UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition)
@@ -152,13 +154,15 @@ void AChunkManager::GenerateChunks(FIntVector CentralRenderChunkVector)
 	// Initialize render distance manager
 	ChunkRenderDistance crd(RenderDistance);
 	// Calculate render sphere
-	TArray<FChunkData> ChunksToSpawn = crd.CalculateRenderSphere();
+	//TArray<FChunkData> ChunksToSpawn = crd.CalculateRenderSphere();
+	TArray<FChunkData> ChunksToSpawn = crd.CalculateRenderDisk();
+
+	// ChunkData returned from CalculateRenderDisk currently only use position. Could be replace with a Vector array.
 
 	// Spawn all chunks to be used for the rest of the game session
 	for (FChunkData& chunk : ChunksToSpawn)
 	{
 		SpawnChunk(chunk, CentralRenderChunkVector);
-		TotalChunks++;
 	}
 	ChunksToSpawn.Empty();
 	ChunkGenerationLayersExpected[int(ECompletedGenerationLayer::InitialTerrainLayer)] = TotalChunks;
@@ -168,6 +172,7 @@ void AChunkManager::GenerateChunks(FIntVector CentralRenderChunkVector)
 // Must be done after chunks are spawned, neighbour information used for later generation stages
 bool AChunkManager::CheckChunkForNeighbours(TSharedPtr<FChunkData> ChunkData)
 {
+	//Function may not be needed and can be replaced TODO - always returns true
 	return GetSixPointers(ChunkData);
 }
 
@@ -188,6 +193,7 @@ void AChunkManager::SpawnChunk(FChunkData data, FIntVector CentralRenderChunkVec
 	chunk->ChunkData = ChunkData;
 
 	ActiveChunkMap.Add(ChunkData->Position, ChunkData);
+	TotalChunks++;
 }
 
 // Unused
@@ -256,7 +262,7 @@ void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMesh
 	else //Properties for LOD 1 and 2
 	{
 		Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		Mesh->SetCastShadow(false);
+		Mesh->SetCastShadow(true);
 	}
 	Mesh->CreateMeshSection( //EXCEPTION_ACCESS_VIOLATION reading address 11
 		0,
@@ -302,7 +308,7 @@ void AChunkManager::DistributeBulkChunkUpdates(TArray<FBlockUpdate> BlockUpdates
 			FScopeLock Lock(&CriticalQueuedBlockUpdateAddSection);
 			(*FoundChunkData)->QueuedBlockUpdates.Add(FCachedBlockUpdate(BlockUpdates[i].Position, BlockUpdates[i].Block));
 		}
-		else
+		else if (0) //Not storing any block Updates as with static gen no new chunks are generated.
 		{
 			TArray<FCachedBlockUpdate>* ChunkUpdateCache = CachedChunkUpdateMap.Find(BlockUpdates[i].TargetChunk);//EXCEPTION_ACCESS_VIOLATION occurred here
 			if (ChunkUpdateCache != nullptr)
@@ -327,7 +333,7 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 
 	FCriticalSection CriticalListSection;
 
-	UE_LOG(LogTemp, Warning, TEXT("%f:Initial Generation of new Chunks"), UpdateProfileTimer->GetReset());
+	UE_LOG(LogTemp, Warning, TEXT("%f ms\nInitial Generation of new Chunks"), UpdateProfileTimer->GetReset());
 	// Initial Generation
 	for (auto& Elem : ActiveChunkMap)
 	{
@@ -357,7 +363,7 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 
 	Counter.Set(TotalChunks);
 
-	UE_LOG(LogTemp, Warning, TEXT("%f:Selecting Chunks to Update"), UpdateProfileTimer->GetReset());
+	UE_LOG(LogTemp, Warning, TEXT("%f ms\nSelecting Chunks to Update"), UpdateProfileTimer->GetReset());
 	for (auto& Elem : ActiveChunkMap)
 	{
 		//AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, Elem, &ChunkTrickleDownGenerationList, AllOperationsCompleteEvent, &Counter, &CriticalListSection]()
@@ -391,7 +397,7 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 	AllOperationsCompleteEvent->Wait();
 	AllOperationsCompleteEvent->Reset();
 
-	UE_LOG(LogTemp, Warning, TEXT("%f:Found %d Chunks to Update"), UpdateProfileTimer->GetReset(), ChunkTrickleDownGenerationList.Num());
+	UE_LOG(LogTemp, Warning, TEXT("%f ms\nFound %d Chunks to Update"), UpdateProfileTimer->GetReset(), ChunkTrickleDownGenerationList.Num());
 	if (ChunkTrickleDownGenerationList.Num() == 0)
 	{
 		delete AllOperationsCompleteEvent;
@@ -426,7 +432,7 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 
 	Counter.Set(ChunkTrickleDownGenerationList.Num());
 
-	UE_LOG(LogTemp, Warning, TEXT("%f:Applying Meshes"), UpdateProfileTimer->GetReset());
+	UE_LOG(LogTemp, Warning, TEXT("%f ms\nApplying Meshes"), UpdateProfileTimer->GetReset());
 	for (auto& ChunkData : ChunkTrickleDownGenerationList)
 	{
 		AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, ChunkData, AllOperationsCompleteEvent, &Counter]()
@@ -444,7 +450,7 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 
 	Counter.Set(ChunkTrickleDownGenerationList.Num());
 
-	UE_LOG(LogTemp, Warning, TEXT("%f:Performing CleanUp"), UpdateProfileTimer->GetReset());
+	UE_LOG(LogTemp, Warning, TEXT("%f ms\nPerforming CleanUp"), UpdateProfileTimer->GetReset());
 	for (auto& ChunkData : ChunkTrickleDownGenerationList)
 	{
 		//AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, ChunkData, AllOperationsCompleteEvent, &Counter]()
@@ -459,7 +465,7 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 	AllOperationsCompleteEvent->Wait();
 	AllOperationsCompleteEvent->Reset();
 
-	UE_LOG(LogTemp, Warning, TEXT("%f:Completed %d Chunk Updates"), UpdateProfileTimer->GetReset(), ChunkTrickleDownGenerationList.Num());
+	UE_LOG(LogTemp, Warning, TEXT("%f ms\nCompleted %d Chunk Updates"), UpdateProfileTimer->GetReset(), ChunkTrickleDownGenerationList.Num());
 
 	// Cleanup
 	delete AllOperationsCompleteEvent;
@@ -504,11 +510,11 @@ bool AChunkManager::GetSixPointers(TSharedPtr<FChunkData> ChunkData)
 			{
 				ChunkData->NeighbourChunks.Add(Neighbour);
 			}
-			else
+			/*else
 			{
 				ChunkData->NeighbourChunks.Empty();
 				return false;
-			}
+			}*/
 		}
 	}
 	return true;
@@ -553,5 +559,25 @@ void AChunkManager::CleanUpCachedData(TSharedPtr<FChunkData> ChunkData)
 		if (UpdatesToClean.Num() == 0)
 			CachedChunkUpdateMap.Remove(ChunkData->Position);
 	}
+}
+
+void AChunkManager::ChunkLoadTest()
+{
+	//TSharedPtr<FChunkData>* Elem = ActiveChunkMap.Find(FIntVector(0, 0, 0));
+	//FIntVector ChunkToSave = (*Elem)->Position;
+	//ChunkLoader::SaveChunk((*Elem)->Blocks, ChunkToSave);
+
+	FIntVector load = FIntVector(4, 4, 4);
+	TArray<EBlock> bload;
+
+	ChunkLoader::LoadChunk(bload, load);
+	UE_LOG(LogTemp, Warning, TEXT("Loadedf Chunk = %d,%d,%d"), load.X, load.Y, load.Z);
+
+	FChunkData data;
+	data.Position = load;
+	data.Blocks = bload;
+	data.GenerationLayer = ECompletedGenerationLayer::CompleteInActive;
+
+	SpawnChunk(data, FIntVector(0, 0, 0));
 }
 

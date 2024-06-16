@@ -14,9 +14,9 @@ void UNoiseManager::InitializeArray(TArray<FFastNoise> NoiseArray)
 	if (NoiseArray.Num() == 2)
 	{
 		BaseNoise = InitializeNoise(NoiseArray[0]);
-		WorldHeightCellNoise = InitializeNoise(NoiseArray[1]);
-		WorldHeightCellDensityNoise = InitializeNoise(NoiseArray[1]);
-		WorldHeightCellDensityNoise->SetCellularReturnType(FastNoiseLite::CellularReturnType_Distance);
+		WorldHeightNoise = InitializeNoise(NoiseArray[1]);
+		//WorldHeightCellDensityNoise = InitializeNoise(NoiseArray[1]);
+		//WorldHeightCellDensityNoise->SetCellularReturnType(FastNoiseLite::CellularReturnType_Distance);
 	}
 }
 

@@ -16,6 +16,7 @@ public:
 	~ChunkRenderDistance();
 
 	TArray<FChunkData> CalculateRenderSphere();
+	TArray<FChunkData> CalculateRenderDisk();
 	int CalculateLod(float Distance);
 
 

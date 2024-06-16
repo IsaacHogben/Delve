@@ -16,6 +16,7 @@ class ULocalRegion : public UObject
 	GENERATED_BODY()
 
 public:
+	int Seed = 3353;
 	EBlock Topsoil;
 	EBlock Subsoil;
 	EBlock Bedrock;
@@ -38,9 +39,4 @@ public:
         // Default implementation (if any)
         return EBlock::Null;
     }
-	virtual bool IsInRegion(float& x, float& y, float& z) const
-	{
-		// Default implementation (if any)
-		return false;
-	}
 };

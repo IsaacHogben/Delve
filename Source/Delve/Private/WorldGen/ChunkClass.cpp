@@ -175,18 +175,27 @@ void UChunkClass::AGenerateMesh()
 					const bool CurrentBlockOpaque = CurrentBlock != EBlock::Air;
 					const bool CompareBlockOpaque = CompareBlock != EBlock::Air;
 
-					if (CurrentBlock == EBlock::Leaves && CompareBlock == EBlock::Leaves)
+					//Skip this first 'if' if you want to draw Null blocks
+					if (!ChunkManager->DrawNullBlocks && (CurrentBlock == EBlock::Null || CompareBlock == EBlock::Null))
+					{
+						Mask[N++] = FMask{ EBlock::Null, 0 };
+					}
+					//Leaves - draw both sides if 2 leaf blocks together
+					else if (CurrentBlock == EBlock::Leaves && CompareBlock == EBlock::Leaves)
 					{
 						Mask[N++] = FMask{ CurrentBlock, 2 };
 					}
+					// - draw block if covered by leaf.
 					else if (CurrentBlock == EBlock::Leaves && CompareBlockOpaque)
 					{
 						Mask[N++] = FMask{ CompareBlock, -1 };
 					}
+					// - draw block if covered by leaf (Same but if reverse order)
 					else if (CompareBlock == EBlock::Leaves && CurrentBlockOpaque)
 					{
 						Mask[N++] = FMask{ CurrentBlock, 1 };
 					}
+					// Standard Block draw
 					else if (CurrentBlockOpaque == CompareBlockOpaque)
 					{
 						Mask[N++] = FMask{ EBlock::Null, 0 };
@@ -393,7 +402,8 @@ void UChunkClass::ApplyMesh()
 	
 	if (Mesh)
 	{
-		ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
+		//ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
+		ChunkManager->UpdateMeshSection(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
 		ClearMeshData();
 	}
 	else//Return to game thread
@@ -417,7 +427,6 @@ void UChunkClass::ClearMesh()
 			{
 				ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
 			});
-		
 	}
 }
 
@@ -439,16 +448,15 @@ EBlock UChunkClass::GetBlock(FIntVector Index, bool checkOutsideChunks)
 		FIntVector TargetChunk = GetBlockChunkAndIndex(Index);
 		if (TargetChunk != ChunkData->Position)
 		{
-			//find neighbour by index TODO
 			for (const auto& Neighbour : ChunkData->NeighbourChunks)
 			{
 				if (Neighbour->Position == TargetChunk)
 				{
-					//UE_LOG(LogTemp, Warning, TEXT("Getting block from neighbour"));
 					return Neighbour->Chunk->GetBlock(Index, false);
 				}
 			}
-			UE_LOG(LogTemp, Warning, TEXT("Block Not found. Layer %d. Num Neighbours %d"), ChunkData->GenerationLayer, ChunkData->NeighbourChunks.Num());
+			// Returns Null if can't find neighbour block - should only occur at the edge of the game world
+			return EBlock::Null;
 		}
 	}
 	// Else returns request from within the array

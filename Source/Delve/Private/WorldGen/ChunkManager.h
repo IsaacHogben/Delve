@@ -6,6 +6,7 @@
 #include "ChunkRenderDistance.h"
 #include "ChunkInclude.h"
 #include "NoiseManager.h"
+#include "ChunkLoader.h"
 
 #include "../Utils/ChunkMeshData.h"
 #include "../Utils/VectorFunctionUtils.h"
@@ -47,6 +48,9 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Material Settings")
 	TObjectPtr<UMaterialInterface> Material;
+
+	UPROPERTY(EditAnywhere, Category = "Debug Settings")
+	bool DrawNullBlocks = false;
 
 	UProceduralMeshComponent* CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod);
 
@@ -96,4 +100,5 @@ private:
 	void CleanUpCachedData(TSharedPtr<FChunkData> ChunkData);
 	FCriticalSection CriticalQueuedBlockUpdateAddSection;
 	UExecutionTimer* UpdateProfileTimer;
+	void ChunkLoadTest(); 
 };

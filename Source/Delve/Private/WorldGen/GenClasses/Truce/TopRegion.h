@@ -6,20 +6,21 @@
 #include "WorldGen/GenClasses/LocalRegion.h"
 #include "Utils/FastNoiseLite.h"
 
-#include "CliffRegion.generated.h"
+#include "TopRegion.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class UCliffRegion : public ULocalRegion
+class UTopRegion : public ULocalRegion
 {
-    GENERATED_BODY()
-
+	GENERATED_BODY()
+	
 public:
     FastNoiseLite* Noise;
+    int MaxHeight = 30;
 
-    UCliffRegion()
+    UTopRegion()
     {
         Topsoil = EBlock::Moss;
         Subsoil = EBlock::Stone;
@@ -44,29 +45,14 @@ public:
 
     virtual EBlock GetBlock(ESoilLayer SoilLayer) const override
     {
-        // Specific implementation for Base region
+        // Specific implementation for TopRegion
         return EBlock::Null;
     }
-    bool IsInRegion(float& x, float& y, float& z, float & Value, float & UpValue) const
+    virtual bool IsInRegion(float& x, float& y, float& z) const
     {
-        // Specific implementation for Cliff region
-        if (z > RegionEnd && z < RegionStart)
-        {
-            //Attempt to exclude parts from being in Cliif Region based on their slope
-            float slope = UpValue - Value;
-            if (slope < 0.008f)
-            {
-                if (Noise->GetNoise(x, y, z) < RegionSize)
-                    return true;
-            }
-        }
         return false;
     }
 private:
     // Region start height
-    int RegionStart = -15;
-    int RegionEnd = -304;
-
-    // Portion of the -1 to 1 value that this region occupies
-    float RegionSize = -0.9f;
+    int RegionStart = 0;
 };
