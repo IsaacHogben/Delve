@@ -17,19 +17,21 @@ UChunkClass::~UChunkClass()
 
 void UChunkClass::BeginGeneration()
 {
-	Setup();
 	GenerateProceduralTerrain();
-	AsyncTask(ENamedThreads::GameThread, [this]()
-		{	//Can slow game as mesh section creation isnt queued
-			Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod);
-		});
+}
 
+void UChunkClass::BeginDecoration()
+{
+	TArray<FCachedBlockUpdate> DecoBlockUpdates = TerrainGenerator->AddDecorationsWithContext(ChunkData->Blocks, this);
+	if (DecoBlockUpdates.Num() > 0)
+		ModifyVoxels(DecoBlockUpdates, false);
 }
 
 // Setup of the chunk class. Only done once
 void UChunkClass::Setup()
 {
 	MeshData = new FChunkMeshData();
+	//MeshData2 = new FChunkMeshData();
 
 	/*Noise = new FastNoiseLite(999);
 	Noise->SetFrequency(Frequency);
@@ -43,7 +45,12 @@ void UChunkClass::Setup()
 		FMath::RoundToInt(ChunkWorldPosition.Z)) / ChunkSize;
 
 	BlockSize = WorldScale * Lod;
-	PerspectiveMask = CalculatePerspectiveMask(ChunkWorldPosition / ChunkSize);//playerpos
+	//PerspectiveMask = CalculatePerspectiveMask(ChunkWorldPosition / ChunkSize);//playerpos
+	AsyncTask(ENamedThreads::GameThread, [this]()
+		{	//Can slow game as mesh section creation isnt queued
+			Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod, EMeshType::OpaqueCollision);
+			//Mesh2 = ChunkManager->CreateMeshSection(MeshData2, ChunkWorldPosition, VertexCount2, Lod, EMeshType::TransparentNoCollision);
+		});
 }
 
 void UChunkClass::StartAsyncChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition)
@@ -84,12 +91,12 @@ void UChunkClass::UpdateChunkLodAsync(int RenderDistance, const float Distance, 
 	if (!ContinueToUpdate)
 		return;
 
-	ClearMeshData();
-	AGenerateMesh();
+	//ClearMeshData();
+	//AGenerateMesh();
 
-	FGraphEventRef CompletionCallback = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
-		UpdateChunkAsyncComplete();
-		}, TStatId(), nullptr, ENamedThreads::GameThread);
+	//FGraphEventRef CompletionCallback = FFunctionGraphTask::CreateAndDispatchWhenReady([this]() {
+		//UpdateChunkAsyncComplete();
+		//}, TStatId(), nullptr, ENamedThreads::GameThread);
 }
 
 void UChunkClass::GetLod(int RenderDistance, const float& Distance, bool& ContinueToUpdate)
@@ -125,7 +132,7 @@ void UChunkClass::UpdatePerspectiveMask(const FVector& PlayerPosition, bool& Con
 
 void UChunkClass::UpdateChunkAsyncComplete()
 {
-	ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
+	//ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
 }
 
 // A Prefix implies function is to be run Asynchronously
@@ -171,6 +178,8 @@ void UChunkClass::AGenerateMesh()
 				{
 					const auto CurrentBlock = GetBlock(ChunkItr, true);
 					const auto CompareBlock = GetBlock(ChunkItr + AxisMask, true);
+					const auto CurrentBlockData = ChunkManager->GetBlockData(CurrentBlock);
+					const auto CompareBlockData = ChunkManager->GetBlockData(CompareBlock);
 
 					const bool CurrentBlockOpaque = CurrentBlock != EBlock::Air;
 					const bool CompareBlockOpaque = CompareBlock != EBlock::Air;
@@ -178,35 +187,35 @@ void UChunkClass::AGenerateMesh()
 					//Skip this first 'if' if you want to draw Null blocks
 					if (!ChunkManager->DrawNullBlocks && (CurrentBlock == EBlock::Null || CompareBlock == EBlock::Null))
 					{
-						Mask[N++] = FMask{ EBlock::Null, 0 };
+						Mask[N++] = FMask{ ChunkManager->GetBlockData(EBlock::Null), 0};
 					}
 					//Leaves - draw both sides if 2 leaf blocks together
-					else if (CurrentBlock == EBlock::Leaves && CompareBlock == EBlock::Leaves)
+					else if (CurrentBlockData->OpacityMask && CompareBlockData->OpacityMask)
 					{
-						Mask[N++] = FMask{ CurrentBlock, 2 };
+						Mask[N++] = FMask{ CurrentBlockData, 2};
 					}
 					// - draw block if covered by leaf.
-					else if (CurrentBlock == EBlock::Leaves && CompareBlockOpaque)
+					else if (CurrentBlockData->OpacityMask && CompareBlockOpaque)
 					{
-						Mask[N++] = FMask{ CompareBlock, -1 };
+						Mask[N++] = FMask{ CompareBlockData, -1};
 					}
 					// - draw block if covered by leaf (Same but if reverse order)
-					else if (CompareBlock == EBlock::Leaves && CurrentBlockOpaque)
+					else if (CompareBlockData->OpacityMask && CurrentBlockOpaque)
 					{
-						Mask[N++] = FMask{ CurrentBlock, 1 };
+						Mask[N++] = FMask{ CurrentBlockData, 1};
 					}
 					// Standard Block draw
 					else if (CurrentBlockOpaque == CompareBlockOpaque)
 					{
-						Mask[N++] = FMask{ EBlock::Null, 0 };
+						Mask[N++] = FMask{ ChunkManager->GetBlockData(EBlock::Null), 0};
 					}
 					else if (CurrentBlockOpaque)
 					{
-						Mask[N++] = FMask{ CurrentBlock, 1 };
+						Mask[N++] = FMask{ CurrentBlockData, 1};
 					}
 					else
 					{
-						Mask[N++] = FMask{ CompareBlock, -1 };
+						Mask[N++] = FMask{ CompareBlockData, -1};
 					}
 				}
 			}
@@ -223,47 +232,53 @@ void UChunkClass::AGenerateMesh()
 					//const auto Normal = FIntVector(AxisMask * Mask[N].Normal);
 					if (Mask[N].Normal != 0)
 					{
-						const auto CurrentMask = Mask[N];
+						
+						auto CurrentMask = Mask[N];
 						ChunkItr[Axis1] = i;
 						ChunkItr[Axis2] = j;
 
-						int Width;
+						int Width = 1;
+						int Height = 1;
 
-						for (Width = 1; i + Width < Axis1Limit && CompareMask(Mask[N + Width], CurrentMask); ++Width)
+						if (Mask[N].BlockData->GreedyMesh) //check for all other mesh types
 						{
-						}
-
-						int Height;
-						bool Done = false;
-
-						for (Height = 1; j + Height < Axis2Limit; ++Height)
-						{
-							for (int k = 0; k < Width; ++k)
+							for (Width = 1; i + Width < Axis1Limit && CompareMask(Mask[N + Width], CurrentMask); ++Width)
 							{
-								if (CompareMask(Mask[N + k + Height * Axis1Limit], CurrentMask)) continue;
-
-								Done = true;
-								break;
 							}
 
-							if (Done) break;
+							bool Done = false;
+
+							for (Height = 1; j + Height < Axis2Limit; ++Height)
+							{
+								for (int k = 0; k < Width; ++k)
+								{
+									if (CompareMask(Mask[N + k + Height * Axis1Limit], CurrentMask))			continue;
+
+									Done = true;
+									break;
+								}
+
+								if (Done) break;
+							}
 						}
 
 						DeltaAxis1[Axis1] = Width;
 						DeltaAxis2[Axis2] = Height;
 
 						// Normal of Two means two sided mesh
-						if (CurrentMask.Normal == 2)
+						if (CurrentMask.BlockData->IsTwoSided && CurrentMask.Normal == 2)
 						{
-							CreateQuad(
-								FMask(CurrentMask.Block, 1), AxisMask, Width, Height,
+							CurrentMask.Normal = -1;
+							CreateQuad(MeshData, VertexCount,
+								CurrentMask, AxisMask, Width, Height,
 								FVector(ChunkItr),
 								FVector(ChunkItr + DeltaAxis1),
 								FVector(ChunkItr + DeltaAxis2),
 								FVector(ChunkItr + DeltaAxis1 + DeltaAxis2)
 							);
-							CreateQuad(
-								FMask(CurrentMask.Block, -1), AxisMask, Width, Height,
+							CurrentMask.Normal = 1;
+							CreateQuad(MeshData, VertexCount,
+								CurrentMask, AxisMask, Width, Height,
 								FVector(ChunkItr),
 								FVector(ChunkItr + DeltaAxis1),
 								FVector(ChunkItr + DeltaAxis2),
@@ -271,13 +286,11 @@ void UChunkClass::AGenerateMesh()
 							);
 						}
 						else
-							CreateQuad(
-								CurrentMask, AxisMask, Width, Height,
+							CreateQuad(MeshData, VertexCount, CurrentMask, AxisMask,
+								Width,
+								Height,
 								FVector(ChunkItr),
-								FVector(ChunkItr + DeltaAxis1),
-								FVector(ChunkItr + DeltaAxis2),
-								FVector(ChunkItr + DeltaAxis1 + DeltaAxis2)
-							);
+								FVector(ChunkItr + DeltaAxis1), FVector(ChunkItr + DeltaAxis2), FVector(ChunkItr + DeltaAxis1 + DeltaAxis2));
 
 						DeltaAxis1 = FIntVector::ZeroValue;
 						DeltaAxis2 = FIntVector::ZeroValue;
@@ -286,7 +299,7 @@ void UChunkClass::AGenerateMesh()
 						{
 							for (int k = 0; k < Width; ++k)
 							{
-								Mask[N + k + l * Axis1Limit] = FMask{ EBlock::Null, 0 };
+								Mask[N + k + l * Axis1Limit] = FMask{ nullptr , 0};
 							}
 						}
 
@@ -304,35 +317,40 @@ void UChunkClass::AGenerateMesh()
 	}
 }
 
-void UChunkClass::CreateQuad(const FMask Mask, const FIntVector AxisMask, const int Width, const int Height, const FVector V1, const FVector V2, const FVector V3,	const FVector V4 )
-{
+void UChunkClass::CreateQuad(FChunkMeshData* meshData, int& vertexCount, const FMask Mask, const FIntVector AxisMask, const int Width, const int Height, const FVector V1,	const FVector V2, const FVector V3, const FVector V4 )
+{	
 	const auto Normal = FVector(AxisMask * Mask.Normal);
-	const auto Color = FColor(0, 0, 0, GetTextureIndex(Mask.Block, Normal));
 
-	MeshData->Vertices.Append({ // Modify the Vertex using the noise value at its position to add wonky variation
+	// Exit Quad creation if blockdata requires.
+	if (Mask.BlockData->DisplayFaces == EBlockDisplayType::OnlySides && (Normal.Z != 0))
+		return;
+
+	const auto Color = FColor(0, Mask.BlockData->OpacityMask, Mask.BlockData->Face_WPO, GetTextureIndex(Mask.BlockData->Block, Normal));
+
+	meshData->Vertices.Append({
 		V1 * BlockSize,
 		V2 * BlockSize,
 		V3 * BlockSize,
 		V4 * BlockSize
 		});
 
-	MeshData->Triangles.Append({// EXCEPTION_ACCESS_VIOLATION reading address 0xffffffffffffffff
-		VertexCount,
-		VertexCount + 2 + Mask.Normal,
-		VertexCount + 2 - Mask.Normal,
-		VertexCount + 3,
-		VertexCount + 1 - Mask.Normal,
-		VertexCount + 1 + Mask.Normal
+	meshData->Triangles.Append({// EXCEPTION_ACCESS_VIOLATION reading address 0xffffffffffffffff
+		vertexCount,
+		vertexCount + 2 + Mask.Normal,
+		vertexCount + 2 - Mask.Normal,
+		vertexCount + 3,
+		vertexCount + 1 - Mask.Normal,
+		vertexCount + 1 + Mask.Normal
 		});
 
-	MeshData->Normals.Append({
+	meshData->Normals.Append({
 		Normal,
 		Normal,
 		Normal,
 		Normal
 		});
 
-	MeshData->Colors.Append({
+	meshData->Colors.Append({
 		Color,
 		Color,
 		Color,
@@ -341,7 +359,7 @@ void UChunkClass::CreateQuad(const FMask Mask, const FIntVector AxisMask, const 
 
 	if (Normal.X == 1 || Normal.X == -1)
 	{
-		MeshData->UV0.Append({
+		meshData->UV0.Append({
 			FVector2D(Width, Height),
 			FVector2D(0, Height),
 			FVector2D(Width, 0),
@@ -350,7 +368,7 @@ void UChunkClass::CreateQuad(const FMask Mask, const FIntVector AxisMask, const 
 	}
 	else
 	{
-		MeshData->UV0.Append({
+		meshData->UV0.Append({
 			FVector2D(Height, Width),
 			FVector2D(Height, 0),
 			FVector2D(0, Width),
@@ -358,7 +376,7 @@ void UChunkClass::CreateQuad(const FMask Mask, const FIntVector AxisMask, const 
 			});
 	}
 
-	VertexCount += 4;
+	vertexCount += 4;
 }
 
 //Compares the new face normal against the chunks normal mask
@@ -374,7 +392,9 @@ bool UChunkClass::CompareNormalMask(FIntVector Normal)
 
 bool UChunkClass::CompareMask(const FMask M1, const FMask M2) const
 {
-	return M1.Block == M2.Block && M1.Normal == M2.Normal;
+	if (M1.BlockData == nullptr)
+		return false;
+	return M1.BlockData->Block == M2.BlockData->Block && M1.Normal == M2.Normal;
 }
 
 TArray<FIntVector> UChunkClass::CalculatePerspectiveMask(FVector PlayerPosition)
@@ -400,15 +420,16 @@ void UChunkClass::ApplyMesh()
 {
 	AGenerateMesh();
 	
-	if (Mesh)
+	if (Mesh)//should always have as mesh is created for chunk when chunk is created in setup
 	{
-		//ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
-		ChunkManager->UpdateMeshSection(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
-		ClearMeshData();
+		ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
+		//ChunkManager->UpdateMeshSection(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
+		//ChunkManager->UpdateMeshSection(Mesh2, *MeshData2, ChunkWorldPosition, Lod, VertexCount2);
+		//ClearMeshData();
 	}
 	else//Return to game thread
 	{
-		
+		//Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod, EMeshType::OpaqueCollision);
 	}	
 }
 
@@ -416,6 +437,8 @@ void UChunkClass::ClearMeshData()
 {
 	VertexCount = 0;
 	MeshData->Clear();
+	VertexCount2 = 0;
+	MeshData2->Clear();
 }
 
 void UChunkClass::ClearMesh()

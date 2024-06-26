@@ -15,6 +15,7 @@
 #include "../Utils/FastNoiseLite.h"
 #include "../Utils/ChunkMeshData.h"
 #include "../Utils/VectorFunctionUtils.h"
+#include "../Utils/BlockStructs.h"
 #include <chrono>
 
 #include "ChunkClass.generated.h"
@@ -26,6 +27,7 @@ class AProceduralTerrain;
 struct FBlockUpdate;
 struct FCachedBlockUpdate;
 struct FChunkData;
+//struct FBlockData;
 
 USTRUCT()
 struct FMask
@@ -33,10 +35,13 @@ struct FMask
 	GENERATED_BODY()
 
 	//UPROPERTY()
-	EBlock Block;
+	//EBlock Block;
+	FBlockData* BlockData;
 
 	//UPROPERTY()
 	int Normal;
+
+	
 };
 
 UCLASS()
@@ -49,13 +54,16 @@ public:
 	~UChunkClass();
 	
 	void BeginGeneration();
-
+	void BeginDecoration();
+		
 	void Setup();
 
 	UPROPERTY()
 	AChunkManager* ChunkManager;
 	UPROPERTY()
 	UProceduralMeshComponent* Mesh;
+	UPROPERTY()
+	UProceduralMeshComponent* Mesh2;
 	UPROPERTY()
 	AProceduralTerrain* TerrainGenerator;
 	TSharedPtr<FChunkData> ChunkData;
@@ -75,6 +83,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Chunk")
 	int Lod = 1;
 	TObjectPtr<UMaterialInterface> Material;
+	TObjectPtr<UMaterialInterface> Material2;
 
 	UFUNCTION(BlueprintCallable, Category = "Chunk")
 	FIntVector ModifyVoxel(FIntVector& Position, const EBlock& Block, bool RegenerateMesh, bool OnlyReplaceAir);
@@ -89,14 +98,15 @@ public:
 
 protected:
 	
-	void StartAsyncChunkGen(const FVector& PlayerPosition);
+	//void StartAsyncChunkGen(const FVector& PlayerPosition);
 
 	void ModifyVoxelData(const FIntVector Position, const EBlock Block);
 	void GenerateProceduralTerrain();
 	FastNoiseLite* Noise;
 
-	UPROPERTY()
+	//UPROPERTY()
 	int VertexCount = 0;
+	int VertexCount2 = 0;
 
 private:
 
@@ -104,6 +114,7 @@ private:
 	TArray<FIntVector> PerspectiveMask;
 	FGraphEventArray TasksList;
 	FChunkMeshData* MeshData;
+	FChunkMeshData* MeshData2;
 	
 	bool IsChunkEmpty = true;
 
@@ -115,7 +126,7 @@ private:
 
 	//Mesh
 	void AGenerateMesh();
-	void CreateQuad(FMask Mask, FIntVector AxisMask, int Width, int Height, FVector V1, FVector V2, FVector V3, FVector V4);
+	void CreateQuad(FChunkMeshData* meshData, int& vertexCount, FMask Mask, FIntVector AxisMask, int Width, int Height, FVector V1, FVector V2, FVector V3, FVector V4);
 	void ClearMeshData();
 
 	//Utils

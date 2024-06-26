@@ -28,11 +28,33 @@ AChunkManager::~AChunkManager()
 void AChunkManager::BeginPlay()
 {
 	Super::BeginPlay();
+
 	//Setup
+	// Initialize BlockDataArray
+	BlockDataTable->GetAllRows("", BlockDataArray);
+	
 	TerrainGenerator->Initialize();
-	//ChunkLoadTest();
-	GenerateChunks(PreviousPlayerChunkPosition);
-	UpdateChunkGenerationLayerStatus();
+
+	if (LoadFromFile)
+	{
+		GenerateChunksFromFile();
+		UpdateChunkGenerationLayerStatus();
+	}
+	else
+	{
+		GenerateChunksNew(PreviousPlayerChunkPosition);
+		UpdateChunkGenerationLayerStatus();
+		if (SaveToFile)
+			ChunkLoader::SaveAllChunks(ActiveChunkMap);
+	}
+}
+
+// Function to get a block data by name
+FBlockData* AChunkManager::GetBlockData(const EBlock Block)
+{
+	return BlockDataArray[uint8(Block)];
+	//const FString Index = FString::FromInt(uint8(Block));
+	//return BlockDataTable->FindRow<FBlockData>(*Index, "");
 }
 
 void AChunkManager::UpdatePlayerChunkPosition(const FVector& PlayerPosition)
@@ -149,7 +171,7 @@ void AChunkManager::UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition
 		});
 }
 
-void AChunkManager::GenerateChunks(FIntVector CentralRenderChunkVector)
+void AChunkManager::GenerateChunksNew(FIntVector CentralRenderChunkVector)
 {
 	// Initialize render distance manager
 	ChunkRenderDistance crd(RenderDistance);
@@ -165,8 +187,24 @@ void AChunkManager::GenerateChunks(FIntVector CentralRenderChunkVector)
 		SpawnChunk(chunk, CentralRenderChunkVector);
 	}
 	ChunksToSpawn.Empty();
-	ChunkGenerationLayersExpected[int(ECompletedGenerationLayer::InitialTerrainLayer)] = TotalChunks;
+	//ChunkGenerationLayersExpected[int(ECompletedGenerationLayer::InitialTerrainLayer)] = TotalChunks;
 	UE_LOG(LogTemp, Warning, TEXT("%d Chunks Spawned."), TotalChunks);
+}
+
+void AChunkManager::GenerateChunksFromFile()
+{
+	UE_LOG(LogTemp, Error, TEXT("Loading Chunks from file"));
+	TArray<FChunkData> ChunksToSpawn;
+	ChunkLoader::LoadAllChunks(ChunksToSpawn);
+	// Spawn all chunks to be used for the rest of the game session
+	for (FChunkData& chunk : ChunksToSpawn)
+	{
+		//UE_LOG(LogTemp, Warning, TEXT("Chunk has %d blocks"), chunk.Blocks.Num());
+		SpawnChunk(chunk, FIntVector(0,0,0));
+	}
+	ChunksToSpawn.Empty();
+	//ChunkGenerationLayersExpected[int(ECompletedGenerationLayer::InitialTerrainLayer)] = TotalChunks;
+	//UE_LOG(LogTemp, Warning, TEXT("%d Chunks Spawned."), TotalChunks);
 }
 
 // Must be done after chunks are spawned, neighbour information used for later generation stages
@@ -188,10 +226,14 @@ void AChunkManager::SpawnChunk(FChunkData data, FIntVector CentralRenderChunkVec
 
 	TSharedPtr<FChunkData> ChunkData = MakeShared<FChunkData>();
 	ChunkData->Lod = data.Lod;
+	ChunkData->line = data.line;
 	ChunkData->Position = data.Position;
 	ChunkData->Chunk = chunk;
-	chunk->ChunkData = ChunkData;
+	ChunkData->GenerationLayer = data.GenerationLayer;
+	ChunkData->Blocks = data.Blocks;
 
+	chunk->ChunkData = ChunkData;
+	chunk->Setup();
 	ActiveChunkMap.Add(ChunkData->Position, ChunkData);
 	TotalChunks++;
 }
@@ -209,22 +251,31 @@ void AChunkManager::StartChunkGeneration()
 	}
 }
 
-UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod)
+UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod, EMeshType MeshType)
 {
 	// Create a new procedural mesh component	
 	UProceduralMeshComponent* Mesh = NewObject<UProceduralMeshComponent>(this);
 
 	if (Mesh)
-	{		
-		// Attach the new mesh component to the root component or any other existing component of the actor
+	{	
 		Mesh->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
-		
+		Mesh->SetCastShadow(true);
 		Mesh->bUseAsyncCooking = true;
-		//Mesh->SetMobility(EComponentMobility::Static);		
 
-		Mesh->SetMaterial(0, Material);
+		if (MeshType == EMeshType::OpaqueCollision)
+		{
+			Mesh->SetMaterial(0, TerrainMaterial);
+			Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			EnqueueMeshUpdate(Mesh, *MeshData, Transform, Lod, Vertexes);
+		}
+		else
+		{
+			Mesh->SetMaterial(0, FoliageMaterial);
+			Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			EnqueueMeshUpdate(Mesh, *MeshData, Transform, Lod, Vertexes);
+		}
+		// Attach the new mesh component to the root component or any other existing component of the actor		
 		
-		EnqueueMeshUpdate(Mesh, *MeshData, Transform, Lod, Vertexes);
 
 		// Optionally, you can also register the component with the scene so it can be rendered and updated
 		Mesh->RegisterComponent();
@@ -243,7 +294,7 @@ void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMesh
 	if (!Vertexes)
 	{
 		Mesh->ClearAllMeshSections();
-		return; //EXCEPTION_ACCESS_VIOLATION reading address 111
+		return;
 	}
 
 	// Calculate Transform
@@ -253,18 +304,8 @@ void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMesh
 		FVector::OneVector
 	);
 	Mesh->SetRelativeTransform(MeshTransform);
-	//Set Properties based on the meshes Lod
-	if (Lod >= 2 && Lod != 0)
-	{
-		Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		Mesh->SetCastShadow(false);
-	}
-	else //Properties for LOD 1 and 2
-	{
-		Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		Mesh->SetCastShadow(true);
-	}
-	Mesh->CreateMeshSection( //EXCEPTION_ACCESS_VIOLATION reading address 11
+
+	Mesh->CreateMeshSection(
 		0,
 		MeshData.Vertices,
 		MeshData.Triangles,
@@ -363,7 +404,7 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 
 	Counter.Set(TotalChunks);
 
-	UE_LOG(LogTemp, Warning, TEXT("%f ms\nSelecting Chunks to Update"), UpdateProfileTimer->GetReset());
+	UE_LOG(LogTemp, Warning, TEXT("%f ms\nGenerating Chunk Decorations"), UpdateProfileTimer->GetReset());
 	for (auto& Elem : ActiveChunkMap)
 	{
 		//AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, Elem, &ChunkTrickleDownGenerationList, AllOperationsCompleteEvent, &Counter, &CriticalListSection]()
@@ -371,8 +412,9 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 				TSharedPtr<FChunkData> ChunkData = Elem.Value;
 				if (ChunkData->GenerationLayer == ECompletedGenerationLayer::InitialTerrainLayer && CheckChunkForNeighbours(ChunkData))
 				{
-					FScopeLock ListLock(&CriticalListSection);
-					ChunkData->GenerationLayer = ECompletedGenerationLayer::HasNeigboursLayer;
+					ChunkData->Chunk->BeginDecoration();
+					ChunkData->GenerationLayer = ECompletedGenerationLayer::GenerateDecorationLayer;
+					FScopeLock ListLock(&CriticalListSection);				
 					ChunkTrickleDownGenerationList.Add(ChunkData);
 				}
 				// Slip in the previously completed chunks to the list to be applied later
@@ -416,10 +458,10 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 		}
 		//AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, ChunkData, AllOperationsCompleteEvent, &Counter]()
 			//{
-				if (ChunkData->GenerationLayer == ECompletedGenerationLayer::HasNeigboursLayer || ChunkData->GenerationLayer == ECompletedGenerationLayer::Complete)
+				if (ChunkData->GenerationLayer == ECompletedGenerationLayer::GenerateDecorationLayer || ChunkData->GenerationLayer == ECompletedGenerationLayer::Complete)
 				{
 					StartDecorationApplication(ChunkData);
-					ChunkData->GenerationLayer = ECompletedGenerationLayer::DecorationLayer;
+					ChunkData->GenerationLayer = ECompletedGenerationLayer::CompleteDecorationLayer;
 				}
 				if (Counter.Decrement() == 0)
 				{
@@ -432,7 +474,7 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 
 	Counter.Set(ChunkTrickleDownGenerationList.Num());
 
-	UE_LOG(LogTemp, Warning, TEXT("%f ms\nApplying Meshes"), UpdateProfileTimer->GetReset());
+	UE_LOG(LogTemp, Warning, TEXT("%f ms\nGenerating Meshes"), UpdateProfileTimer->GetReset());
 	for (auto& ChunkData : ChunkTrickleDownGenerationList)
 	{
 		AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, ChunkData, AllOperationsCompleteEvent, &Counter]()
@@ -570,7 +612,7 @@ void AChunkManager::ChunkLoadTest()
 	FIntVector load = FIntVector(4, 4, 4);
 	TArray<EBlock> bload;
 
-	ChunkLoader::LoadChunk(bload, load);
+	//ChunkLoader::LoadChunk(bload, load);
 	UE_LOG(LogTemp, Warning, TEXT("Loadedf Chunk = %d,%d,%d"), load.X, load.Y, load.Z);
 
 	FChunkData data;

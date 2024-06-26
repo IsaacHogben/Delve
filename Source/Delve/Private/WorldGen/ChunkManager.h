@@ -8,6 +8,7 @@
 #include "NoiseManager.h"
 #include "ChunkLoader.h"
 
+#include "../Utils/BlockStructs.h"
 #include "../Utils/ChunkMeshData.h"
 #include "../Utils/VectorFunctionUtils.h"
 
@@ -47,12 +48,21 @@ public:
 	TObjectPtr<AProceduralTerrain> TerrainGenerator;
 
 	UPROPERTY(EditAnywhere, Category = "Material Settings")
-	TObjectPtr<UMaterialInterface> Material;
+	TObjectPtr<UMaterialInterface> TerrainMaterial;
+	UPROPERTY(EditAnywhere, Category = "Material Settings")
+	TObjectPtr<UMaterialInterface> FoliageMaterial;
+
+	UPROPERTY(EditAnywhere, Category = "Data Tables")
+	TObjectPtr<UDataTable> BlockDataTable;
 
 	UPROPERTY(EditAnywhere, Category = "Debug Settings")
 	bool DrawNullBlocks = false;
+	UPROPERTY(EditAnywhere, Category = "Debug Settings")
+	bool LoadFromFile = false;
+	UPROPERTY(EditAnywhere, Category = "Debug Settings")
+	bool SaveToFile = false;
 
-	UProceduralMeshComponent* CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod);
+	UProceduralMeshComponent* CreateMeshSection(FChunkMeshData* MeshData, FVector Transform, int Vertexes, int Lod, EMeshType MeshType);
 
 	void UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMeshData& MeshData, FVector Transform, int Lod, int Vertices);
 	
@@ -64,11 +74,13 @@ public:
 	void UpdateChunkGenerationLayerStatus();
 	void StartDecorationApplication(TSharedPtr<FChunkData> ChunkData);
 	EBlock GetBlockFromChunk(const FIntVector& BlockIndex, const FIntVector& ChunkIndex);
+	FBlockData* GetBlockData(const EBlock Block);
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-	void GenerateChunks(FIntVector CenterPoint);
+	void GenerateChunksNew(FIntVector CenterPoint);
+	void GenerateChunksFromFile();
 	bool CheckChunkForNeighbours(TSharedPtr<FChunkData> ChunkData);
 	void SpawnChunk(FChunkData dataArray, FIntVector CentralRenderChunkVector);
 
@@ -77,7 +89,7 @@ private:
 	UNoiseManager* NoiseManager;
 
 	int TotalChunks;
-	int ChunkGenerationLayersExpected[3]; //use array when more layers are nescessary.
+	//int ChunkGenerationLayersExpected[3]; //use array when more layers are nescessary.
 
 	void UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition);
 	void StartChunkGeneration();
@@ -86,6 +98,7 @@ private:
 	TMap<FIntVector, TSharedPtr<FChunkData>> ActiveChunkMap;
 	TMap<FIntVector, TSharedPtr<FChunkData>> InActiveChunkMap;
 	TMap<FIntVector, TArray<FCachedBlockUpdate>> CachedChunkUpdateMap;
+	TArray<FBlockData*> BlockDataArray;
 
 	UPROPERTY()
 	FIntVector LastUpdateDirection;
