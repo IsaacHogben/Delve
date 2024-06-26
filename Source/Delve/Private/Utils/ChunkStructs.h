@@ -54,6 +54,7 @@ struct FChunkData
 
 public:
 	bool IsActive;
+	int line;
 	int Lod;
 	UPROPERTY()
 	FIntVector Position;
@@ -70,6 +71,7 @@ public:
 	// Default constructor
 	FChunkData()
 		: IsActive(true)
+		, line(-1)
 		, Lod(1)
 		, Position(FIntVector::ZeroValue)
 		, Chunk(nullptr)
