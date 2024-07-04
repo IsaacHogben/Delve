@@ -46,11 +46,7 @@ void UChunkClass::Setup()
 
 	BlockSize = WorldScale * Lod;
 	//PerspectiveMask = CalculatePerspectiveMask(ChunkWorldPosition / ChunkSize);//playerpos
-	AsyncTask(ENamedThreads::GameThread, [this]()
-		{	//Can slow game as mesh section creation isnt queued
-			Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod, EMeshType::OpaqueCollision);
-			//Mesh2 = ChunkManager->CreateMeshSection(MeshData2, ChunkWorldPosition, VertexCount2, Lod, EMeshType::TransparentNoCollision);
-		});
+
 }
 
 void UChunkClass::StartAsyncChunkLodUpdate(int RenderDistance, const float Distance, const FVector PlayerPosition)
@@ -419,26 +415,20 @@ TArray<FIntVector> UChunkClass::CalculatePerspectiveMask(FVector PlayerPosition)
 void UChunkClass::ApplyMesh()
 {
 	AGenerateMesh();
+	//ChunkData->Blocks.Empty();
 	
-	if (Mesh)//should always have as mesh is created for chunk when chunk is created in setup
-	{
-		ChunkManager->EnqueueMeshUpdate(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
-		//ChunkManager->UpdateMeshSection(Mesh, *MeshData, ChunkWorldPosition, Lod, VertexCount);
-		//ChunkManager->UpdateMeshSection(Mesh2, *MeshData2, ChunkWorldPosition, Lod, VertexCount2);
-		//ClearMeshData();
-	}
-	else//Return to game thread
-	{
-		//Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod, EMeshType::OpaqueCollision);
-	}	
+	AsyncTask(ENamedThreads::GameThread, [this]()
+		{
+			Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod, EMeshType::OpaqueCollision);
+			VertexCount = 0;
+		});
+	
 }
 
 void UChunkClass::ClearMeshData()
 {
 	VertexCount = 0;
 	MeshData->Clear();
-	VertexCount2 = 0;
-	MeshData2->Clear();
 }
 
 void UChunkClass::ClearMesh()

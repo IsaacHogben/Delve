@@ -22,7 +22,7 @@ public:
     UCliffRegion()
     {
         Topsoil = EBlock::Moss;
-        Subsoil = EBlock::Stone;
+        Subsoil = EBlock::CliffStone;
         Bedrock = EBlock::CliffStone;
 
         Noise = new FastNoiseLite(Seed);
@@ -65,7 +65,7 @@ public:
 private:
     // Region start height
     int RegionStart = -15;
-    int RegionEnd = -304;
+    int RegionEnd = -370;
 
     // Portion of the -1 to 1 value that this region occupies
     float RegionSize = -0.9f;

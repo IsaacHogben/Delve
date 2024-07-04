@@ -4,7 +4,7 @@
 UENUM(BlueprintType)
 enum class EBlock : uint8
 {
-	Null, Air, Stone, Dirt, Grass, Leaves, CliffStone, Moss, Log, Vine
+	Null, Air, Stone, Dirt, Grass, Leaves, CliffStone, Moss, Log, Vine, Ruin
 };
 
 UENUM(BlueprintType)
@@ -23,6 +23,12 @@ UENUM(BlueprintType)
 enum class ESoilLayer : uint8
 {
 	Topsoil, Subsoil, Bedrock
+};
+
+UENUM(BlueprintType)
+enum class EFoliageType : uint8
+{
+	Sphere
 };
 
 UENUM(BlueprintType)

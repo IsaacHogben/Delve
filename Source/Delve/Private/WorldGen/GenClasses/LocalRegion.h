@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "../../Utils/Enums.h"
+#include "WorldGen/GenClasses/ProceduralParts.h"
+#include "Utils/FastNoiseLite.h"
 
 #include "LocalRegion.generated.h"
 /**
@@ -16,7 +18,7 @@ class ULocalRegion : public UObject
 	GENERATED_BODY()
 
 public:
-	int Seed = 3353;
+	int Seed = 33535335;
 	EBlock Topsoil;
 	EBlock Subsoil;
 	EBlock Bedrock;

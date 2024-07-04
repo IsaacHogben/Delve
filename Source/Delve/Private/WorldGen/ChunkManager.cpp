@@ -407,8 +407,8 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 	UE_LOG(LogTemp, Warning, TEXT("%f ms\nGenerating Chunk Decorations"), UpdateProfileTimer->GetReset());
 	for (auto& Elem : ActiveChunkMap)
 	{
-		//AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, Elem, &ChunkTrickleDownGenerationList, AllOperationsCompleteEvent, &Counter, &CriticalListSection]()
-			//{
+		AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, Elem, &ChunkTrickleDownGenerationList, AllOperationsCompleteEvent, &Counter, &CriticalListSection]()
+			{
 				TSharedPtr<FChunkData> ChunkData = Elem.Value;
 				if (ChunkData->GenerationLayer == ECompletedGenerationLayer::InitialTerrainLayer && CheckChunkForNeighbours(ChunkData))
 				{
@@ -434,7 +434,7 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 				{
 					AllOperationsCompleteEvent->Trigger();
 				}
-			//});
+			});
 	}
 	AllOperationsCompleteEvent->Wait();
 	AllOperationsCompleteEvent->Reset();
@@ -568,8 +568,8 @@ void AChunkManager::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	// Define the base and maximum updates per tick
-	const int BaseUpdatesPerTick = 0;
-	const int MaxUpdatesPerTick = 3; // Maximum updates to allow per frame
+	const int BaseUpdatesPerTick = 1;
+	const int MaxUpdatesPerTick = 15; // Maximum updates to allow per frame
 
 	// Calculate target updates per tick based on DeltaTime
 	// Assuming a base frame rate of 60 FPS for reference

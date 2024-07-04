@@ -5,19 +5,32 @@
 #include "CoreMinimal.h"
 #include "ChunkInclude.h"
 #include "../Utils/FastNoiseLite.h"
-#include "../Utils/ChunkStructs.h"
+#include <stack>
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 
 #include "GenClasses/Truce/BaseRegion.h"
 #include "GenClasses/Truce/CliffRegion.h"
+#include "GenClasses/ProceduralParts.h"
 
 #include "ProceduralTerrain.generated.h"
 
 class UNoiseManager;
 struct FCachedBlockUpdate;
 struct FFastNoise;
+struct FTreeSystem;
 /**
  * 
  */
+struct LSystem {
+	FString Axiom;
+	TMap<TCHAR, FString> Rules;
+	float Angle;
+	float AngleDeviation;
+	float TrunkDeviation;
+	int BaseBranchLength;
+	int BaseTrunkRadius;
+};
 
 UCLASS()
 class AProceduralTerrain : public AActor
@@ -40,31 +53,49 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Curves")
 	UCurveFloat* WorldEdgeDensityCurve;
 
+	UPROPERTY(EditAnywhere, Category = "DataTables")
+	TObjectPtr<UDataTable> TreeDataTable;
+
+	UPROPERTY(EditAnywhere, Category = "Instanced")
+	UHierarchicalInstancedStaticMeshComponent* HISMC;
+	UPROPERTY(EditAnywhere, Category = "Instanced")
+	UStaticMesh* IMGrass;
+	UPROPERTY(EditAnywhere, Category = "Instanced")
+	UMaterialInterface* GrassMat;
+
 	FIntVector2 WorldCenter = FIntVector2(0, 0);
 	int ChunkSize = 64;
 	int GetBlockIndex(int X, int Y, int Z);
 	
 	TArray<FCachedBlockUpdate> GetGeneratedChunk(FVector ChunkPosition, FIntVector ChunkVectorPosition, TArray<EBlock>& BlockArray, bool& isChunkEmpty);
 
+	// Uses the generated terrain array to add decorations.
+	TArray<FCachedBlockUpdate> AddDecorationsWithContext(TArray<EBlock>& BlockArray, UChunkClass* Chunk);
+
 protected:
 
 
 private:
 	EBlock GetTerrainLevelOne(float x, float y, float z, EBlock AboveBlock);
-	float GetNoiseLevelOne(float x, float y, float z);
-
-	bool IsInLocalRegion(FastNoiseLite* Region, float RegionSize, float& x, float& y, float& z);
+	//float GetNoiseLevelOne(float x, float y, float z);
+	TArray<FTreeSystem*> TreeDataArray;
+	TArray<FVector> InstancedMeshPositions;
+	//bool IsInLocalRegion(FastNoiseLite* Region, float RegionSize, float& x, float& y, float& z);
 	EBlock GetBlockFromRegion(ULocalRegion* LocalRegion, ESoilLayer SoilLayer);
 
 	bool IsSurfaceBlock(float AboveValue, float Density);
 	bool IsAir(float Value, float Density);
 
-	void AddReferencelessDecorations(TArray<EBlock>& BlockArray, FastNoiseLite* Noise, TArray<FCachedBlockUpdate>&
-		BlockUpdates);
+	void AddReferencelessDecorations(TArray<EBlock>& BlockArray, FastNoiseLite* Noise, TArray<FCachedBlockUpdate>& BlockUpdates);
+
 	void MakeTestShape(TArray<FCachedBlockUpdate>& BlockUpdates, int x, int y, int z);
-	void MakeTestTree(TArray<FCachedBlockUpdate>& BlockUpdates, int x, int y, int z);
+
+	void MakeTestVine(TArray<FCachedBlockUpdate>& BlockUpdates, int x, int y, int z);
 	void AddCylinder(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int height, int centerX, int centerY, int baseZ, EBlock blockType);
 	void AddSphere(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int centerX, int centerY, int centerZ, EBlock blockType);
+	void AddCanopy(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int centerX, int centerY, int centerZ, EBlock blockType, uint8 density);
+	void GenerateTestTreeAtLocation(TArray<FCachedBlockUpdate>& BlockUpdates, UChunkClass* Chunk, int x, int y, int z);
+	void GenerateTree(TArray<FCachedBlockUpdate>& BlockUpdates, UChunkClass* Chunk, int x, int y, int z, const FTreeSystem& system);
 
 	//Local Regions
 	UPROPERTY()

@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "Utils/Enums.h"
-#include "Utils/ChunkStructs.h"
 
 struct FChunkData;
 

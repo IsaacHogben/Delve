@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "WorldGen/GenClasses/LocalRegion.h"
-#include "Utils/FastNoiseLite.h"
+
 
 #include "BaseRegion.generated.h"
 
@@ -19,15 +19,17 @@ class UBaseRegion : public ULocalRegion
 public:
     FastNoiseLite* Noise;
 
+    FTreeSystem Tree1;
+
     UBaseRegion()
     {
         Noise = new FastNoiseLite(Seed);
-        Noise->SetFrequency(0.05);
+        Noise->SetFrequency(0.17);
         Noise->SetNoiseType(FastNoiseLite::NoiseType_Perlin);
 
         Noise->SetFractalType(FastNoiseLite::FractalType_FBm);
-        Noise->SetFractalOctaves(3);
-        Noise->SetFractalGain(2); // Size of subsequent octaves
+        Noise->SetFractalOctaves(5);
+        Noise->SetFractalGain(2.75); // Size of subsequent octaves
         Noise->SetFractalLacunarity(0.5); // Density
         
     };

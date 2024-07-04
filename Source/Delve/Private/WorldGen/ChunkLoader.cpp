@@ -14,25 +14,42 @@ int ChunkLoader::LoadAllChunks(TArray<FChunkData>& chunks)
         return -1;
     }
     int32 LineNumber = 0;
+
+    /*int32 TotalLines = Lines.Num();
+    FThreadSafeCounter Counter(TotalLines);
+    FEvent* AllOperationsCompleteEvent = FPlatformProcess::GetSynchEventFromPool(true);
+    chunks.SetNumUninitialized(TotalLines);*/
+
     for (const FString& Line : Lines)
     {
-        try
-        {
-            UE_LOG(LogTemp, Error, TEXT("Loading Chunk on line %d."), LineNumber);
-            ChunkSaveData chunkSaveData = DeserializeChunkData(TCHAR_TO_UTF8(*Line));
-            FChunkData chunkData;
-            chunkData.Position = chunkSaveData.ChunkPosition;
-            chunkData.Blocks = ConvertUInt8ToEnumArray(DecompressBlocks(chunkSaveData.CompressedBlocks, chunkSaveData.BlockTypeMap, chunkSaveData.BitsNeeded));
-            chunkData.line = LineNumber;
-            UE_LOG(LogTemp, Error, TEXT("Loaded Chunk %d.%d.%d with %d Blocks from line %d."), chunkData.Position.X, chunkData.Position.Y, chunkData.Position.Z, chunkData.Blocks.Num(), LineNumber);
-            chunks.Add(chunkData);
-            LineNumber++;
-        }
-        catch (const LoadFailedException& e)
-        {
-            UE_LOG(LogTemp, Error, TEXT("Error deserializing chunk data: %s"), *FString(e.what()));
-            return -1;
-        }
+        //AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [&chunks, &LineNumber, &Counter, &AllOperationsCompleteEvent]()
+           // {
+                try
+                {
+                    //UE_LOG(LogTemp, Error, TEXT("Loading Chunk on line %d."), LineNumber);
+                    ChunkSaveData chunkSaveData = DeserializeChunkData(TCHAR_TO_UTF8(*Line));
+                    FChunkData chunkData;
+                    chunkData.Position = chunkSaveData.ChunkPosition;
+                    chunkData.Blocks = ConvertUInt8ToEnumArray(DecompressBlocks(chunkSaveData.CompressedBlocks, chunkSaveData.BlockTypeMap, chunkSaveData.BitsNeeded));
+                    chunkData.line = LineNumber;
+                    chunkData.GenerationLayer = ECompletedGenerationLayer::CompleteInActive;
+
+                    //UE_LOG(LogTemp, Error, TEXT("Loaded Chunk %d.%d.%d with %d Blocks from line %d."), chunkData.Position.X, chunkData.Position.Y, chunkData.Position.Z, chunkData.Blocks.Num(), LineNumber);
+                    chunks.Add(chunkData);
+                    LineNumber++;
+                }
+                catch (const LoadFailedException& e)
+                {
+                    UE_LOG(LogTemp, Error, TEXT("Error deserializing chunk data: %s"), *FString(e.what()));
+                    return -1;
+                }
+                /*if (Counter.Decrement() == 0)
+                {
+                    AllOperationsCompleteEvent->Trigger();
+                }*/
+            //});
+
+        //AllOperationsCompleteEvent->Wait();
     }
 
     return 0;
