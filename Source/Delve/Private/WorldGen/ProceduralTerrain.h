@@ -70,7 +70,8 @@ public:
 	TArray<FCachedBlockUpdate> GetGeneratedChunk(FVector ChunkPosition, FIntVector ChunkVectorPosition, TArray<EBlock>& BlockArray, bool& isChunkEmpty);
 
 	// Uses the generated terrain array to add decorations.
-	TArray<FCachedBlockUpdate> AddDecorationsWithContext(TArray<EBlock>& BlockArray, UChunkClass* Chunk);
+	TArray<FCachedBlockUpdate> AddDecorationsWithContext(TArray<EBlock>& BlockArray, TArray<FVector>& InstancedMeshPositions, UChunkClass* Chunk, FVector& ChunkPosition);
+	void ApplyInstancedFoliage(TArray<FVector>& Positions);
 
 protected:
 
@@ -79,7 +80,6 @@ private:
 	EBlock GetTerrainLevelOne(float x, float y, float z, EBlock AboveBlock);
 	//float GetNoiseLevelOne(float x, float y, float z);
 	TArray<FTreeSystem*> TreeDataArray;
-	TArray<FVector> InstancedMeshPositions;
 	//bool IsInLocalRegion(FastNoiseLite* Region, float RegionSize, float& x, float& y, float& z);
 	EBlock GetBlockFromRegion(ULocalRegion* LocalRegion, ESoilLayer SoilLayer);
 

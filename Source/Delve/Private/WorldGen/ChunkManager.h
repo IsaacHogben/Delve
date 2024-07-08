@@ -71,7 +71,7 @@ public:
 
 	void EnqueueMeshUpdate(UProceduralMeshComponent* Mesh, FChunkMeshData& MeshData, FVector ChunkWorldPosition, int Lod, int VertexCount);
 	void DistributeBulkChunkUpdates(TArray<FBlockUpdate> BlockUpdates);
-	void UpdateChunkGenerationLayerStatus();
+	void StartChunkGenSequence();
 	void StartDecorationApplication(TSharedPtr<FChunkData> ChunkData);
 	EBlock GetBlockFromChunk(const FIntVector& BlockIndex, const FIntVector& ChunkIndex);
 	FBlockData* GetBlockData(const EBlock Block);

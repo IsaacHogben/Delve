@@ -13,7 +13,7 @@ void UNoiseManager::InitializeArray(TArray<FFastNoise> NoiseArray)
 	UE_LOG(LogTemp, Warning, TEXT("NoiseArray.Num() == %d"), NoiseArray.Num());
 	if (NoiseArray.Num() == 2)
 	{
-		BaseNoise = InitializeNoise(NoiseArray[0]);
+		InputNoise = InitializeNoise(NoiseArray[0]);
 		WorldHeightNoise = InitializeNoise(NoiseArray[1]);
 		//WorldHeightCellDensityNoise = InitializeNoise(NoiseArray[1]);
 		//WorldHeightCellDensityNoise->SetCellularReturnType(FastNoiseLite::CellularReturnType_Distance);

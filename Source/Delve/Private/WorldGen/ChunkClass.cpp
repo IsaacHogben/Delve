@@ -20,9 +20,9 @@ void UChunkClass::BeginGeneration()
 	GenerateProceduralTerrain();
 }
 
-void UChunkClass::BeginDecoration()
+void UChunkClass::BeginDecorationGen()
 {
-	TArray<FCachedBlockUpdate> DecoBlockUpdates = TerrainGenerator->AddDecorationsWithContext(ChunkData->Blocks, this);
+	TArray<FCachedBlockUpdate> DecoBlockUpdates = TerrainGenerator->AddDecorationsWithContext(ChunkData->Blocks, FoliageInstancePositions, this, ChunkWorldPosition);
 	if (DecoBlockUpdates.Num() > 0)
 		ModifyVoxels(DecoBlockUpdates, false);
 }
@@ -262,15 +262,18 @@ void UChunkClass::AGenerateMesh()
 						DeltaAxis2[Axis2] = Height;
 
 						// Normal of Two means two sided mesh
-						if (CurrentMask.BlockData->IsTwoSided && CurrentMask.Normal == 2)
+						if (CurrentMask.BlockData->IsTwoSided || CurrentMask.Normal == 2)
 						{
+							//Prevents two sided meshes from 
+							FVector TwoSidedOffset = FVector(0.01, 0.01, 0.01) * FVector(AxisMask);
+							//UE_LOG(LogTemp, Warning, TEXT("TWO SIDED VECTOR"),;
 							CurrentMask.Normal = -1;
 							CreateQuad(MeshData, VertexCount,
 								CurrentMask, AxisMask, Width, Height,
-								FVector(ChunkItr),
-								FVector(ChunkItr + DeltaAxis1),
-								FVector(ChunkItr + DeltaAxis2),
-								FVector(ChunkItr + DeltaAxis1 + DeltaAxis2)
+								FVector(TwoSidedOffset + FVector(ChunkItr)),
+								FVector(TwoSidedOffset + FVector(ChunkItr) + FVector(DeltaAxis1)),
+								FVector(TwoSidedOffset + FVector(ChunkItr) + FVector(DeltaAxis2)),
+								FVector(TwoSidedOffset + FVector(ChunkItr) + FVector(DeltaAxis1) + FVector(DeltaAxis2))
 							);
 							CurrentMask.Normal = 1;
 							CreateQuad(MeshData, VertexCount,
@@ -420,9 +423,9 @@ void UChunkClass::ApplyMesh()
 	AsyncTask(ENamedThreads::GameThread, [this]()
 		{
 			Mesh = ChunkManager->CreateMeshSection(MeshData, ChunkWorldPosition, VertexCount, Lod, EMeshType::OpaqueCollision);
+			TerrainGenerator->ApplyInstancedFoliage(FoliageInstancePositions);
 			VertexCount = 0;
 		});
-	
 }
 
 void UChunkClass::ClearMeshData()

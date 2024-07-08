@@ -123,6 +123,6 @@ public:
 	FastNoiseLite* InitializeNoise(FFastNoise& NoiseSettings);
 
 	// Noise for level 1
-	FastNoiseLite* BaseNoise;
+	FastNoiseLite* InputNoise;
 	FastNoiseLite* WorldHeightNoise;
 };

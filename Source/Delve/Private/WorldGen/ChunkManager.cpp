@@ -38,12 +38,12 @@ void AChunkManager::BeginPlay()
 	if (LoadFromFile)
 	{
 		GenerateChunksFromFile();
-		UpdateChunkGenerationLayerStatus();
+		StartChunkGenSequence();
 	}
 	else
 	{
 		GenerateChunksNew(PreviousPlayerChunkPosition);
-		UpdateChunkGenerationLayerStatus();
+		StartChunkGenSequence();
 		if (SaveToFile)
 			ChunkLoader::SaveAllChunks(ActiveChunkMap);
 	}
@@ -163,7 +163,7 @@ void AChunkManager::UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition
 				UpdateOperationsCompleteEvent->Wait();
 				delete UpdateOperationsCompleteEvent;
 				UE_LOG(LogTemp, Warning, TEXT("%f: Chunks Calculated"), UpdateProfileTimer->GetReset());
-				UpdateChunkGenerationLayerStatus();
+				StartChunkGenSequence();
 				PreviousPlayerChunkPosition = NewPlayerChunkPosition;
 
 				UE_LOG(LogTemp, Warning, TEXT("%f: Update finished"), UpdateProfileTimer->GetReset());
@@ -304,6 +304,7 @@ void AChunkManager::UpdateMeshSection(UProceduralMeshComponent* Mesh, FChunkMesh
 		FVector::OneVector
 	);
 	Mesh->SetRelativeTransform(MeshTransform);
+	Mesh->SetMobility(EComponentMobility::Static);
 
 	Mesh->CreateMeshSection(
 		0,
@@ -365,8 +366,8 @@ void AChunkManager::DistributeBulkChunkUpdates(TArray<FBlockUpdate> BlockUpdates
 	}
 }
 
-// Chunks send their current generation status here when it is complete to sync layers. All GenerationLayer changes go through here for continuity
-void AChunkManager::UpdateChunkGenerationLayerStatus()
+// Manages Generation of chunks. Orders events, waits for triggers and runds threads.
+void AChunkManager::StartChunkGenSequence()
 {
 	TArray<TSharedPtr<FChunkData>> ChunkTrickleDownGenerationList;
 	FThreadSafeCounter Counter(TotalChunks);
@@ -412,7 +413,7 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 				TSharedPtr<FChunkData> ChunkData = Elem.Value;
 				if (ChunkData->GenerationLayer == ECompletedGenerationLayer::InitialTerrainLayer && CheckChunkForNeighbours(ChunkData))
 				{
-					ChunkData->Chunk->BeginDecoration();
+					ChunkData->Chunk->BeginDecorationGen();
 					ChunkData->GenerationLayer = ECompletedGenerationLayer::GenerateDecorationLayer;
 					FScopeLock ListLock(&CriticalListSection);				
 					ChunkTrickleDownGenerationList.Add(ChunkData);
@@ -456,8 +457,8 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 			UE_LOG(LogTemp, Error, TEXT("Invalid ChunkData"));
 			UE_LOG(LogTemp, Error, TEXT("With layer %d"), ChunkData->GenerationLayer);
 		}
-		//AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, ChunkData, AllOperationsCompleteEvent, &Counter]()
-			//{
+		AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [this, ChunkData, AllOperationsCompleteEvent, &Counter]()
+			{
 				if (ChunkData->GenerationLayer == ECompletedGenerationLayer::GenerateDecorationLayer || ChunkData->GenerationLayer == ECompletedGenerationLayer::Complete)
 				{
 					StartDecorationApplication(ChunkData);
@@ -467,7 +468,7 @@ void AChunkManager::UpdateChunkGenerationLayerStatus()
 				{
 					AllOperationsCompleteEvent->Trigger();
 				}
-			//});
+			});
 	}
 	AllOperationsCompleteEvent->Wait();
 	AllOperationsCompleteEvent->Reset();

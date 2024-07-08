@@ -25,26 +25,9 @@ void AProceduralTerrain::Initialize()
 	CliffRegion = NewObject<UCliffRegion>();
 	// Load TreeData into memory
 	TreeDataTable->GetAllRows("", TreeDataArray);
-	//IMGrass->
-	//InstancedStaticMeshComponent = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("InstancedMesh"));
+
 	HISMC->SetStaticMesh(IMGrass);
 	HISMC->SetMaterial(0, GrassMat);
-	//HISMC->Material
-	//HISMC->Material
-
-	//for (int i = 0; i < 20; i++)
-	//{
-	//	for (int j = 0; j < 50; j++)
-	//	{
-	//		for (int k = 0; k < 1000; k++)
-	//		{
-	//			FTransform InstanceTransform;
-	//			InstanceTransform.SetLocation(FVector(i * 200, j * 200, k * 200)); // Adjust location as needed
-	//			HISMC->AddInstance(InstanceTransform);
-
-	//		}
-	//	}
-	//}
 }
 
 int QuantizeCoordinate(int value, int quantizationStep)
@@ -117,8 +100,8 @@ EBlock AProceduralTerrain::GetTerrainLevelOne(float x, float y, float z, EBlock 
 		UpValue = BaseRegion->Noise->GetNoise(x, y, (UpZ - CliffZMod) * ZSquish);
 	}
 
-	//Alter Density for World Edge
-	int WorldRadius = 768;
+	//Alter Density for World Edge 786 = 15 chunks
+	int WorldRadius = 300;
 	float Distance = FMath::Sqrt(FMath::Square(x - WorldCenter.X) + FMath::Square(y - WorldCenter.Y));
 	if (Distance >= WorldRadius)
 	{
@@ -199,7 +182,6 @@ EBlock AProceduralTerrain::GetTerrainLevelOne(float x, float y, float z, EBlock 
 	return GetBlockFromRegion(LocalRegion, SoilLayer);
 }
 
-
 //Generates first layer terrain and returns FBulkBlockUpdate for additional levels of modification.
 TArray<FCachedBlockUpdate> AProceduralTerrain::GetGeneratedChunk(FVector ChunkPosition, FIntVector ChunkVectorPosition, TArray<EBlock>& BlockArray, bool& IsChunkEmpty)
 {
@@ -216,7 +198,7 @@ TArray<FCachedBlockUpdate> AProceduralTerrain::GetGeneratedChunk(FVector ChunkPo
 			{				
 				if (0)// TEST NOISE - Used to test new noise values on their own
 				{
-					float noise = N->BaseNoise->GetNoise(float(x) + ChunkPosition.X, float(y) + ChunkPosition.Y, float(z) + ChunkPosition.Z);
+					float noise = N->InputNoise->GetNoise(float(x) + ChunkPosition.X, float(y) + ChunkPosition.Y, float(z) + ChunkPosition.Z);
 					if (noise > ZDensityCurve->GetFloatValue(z + ChunkPosition.Z))
 						BlockArray[GetBlockIndex(x, y, z)] = EBlock::Air;
 					else
@@ -286,7 +268,7 @@ void AProceduralTerrain::AddReferencelessDecorations(TArray<EBlock>& BlockArray,
 	}
 }
 
-TArray<FCachedBlockUpdate> AProceduralTerrain::AddDecorationsWithContext(TArray<EBlock>& BlockArray, UChunkClass* Chunk)
+TArray<FCachedBlockUpdate> AProceduralTerrain::AddDecorationsWithContext(TArray<EBlock>& BlockArray, TArray<FVector>& InstancedMeshPositions, UChunkClass* Chunk, FVector& ChunkPosition)
 {
 	TArray<FCachedBlockUpdate> BlockUpdates;
 	for (int x = 0; x < ChunkSize; ++x)
@@ -317,12 +299,19 @@ TArray<FCachedBlockUpdate> AProceduralTerrain::AddDecorationsWithContext(TArray<
 						else if (FMath::RandRange(0, 12) == 0 && Chunk->GetBlock(FIntVector(x, y, z + 1), true) == EBlock::Dirt)
 							MakeTestVine(BlockUpdates, x, y, z);
 					}
-					if (Block == EBlock::Grass && FMath::RandRange(0, 15) == 0)
+					if (Block == EBlock::Grass)
 					{
-						//FTransform InstanceTransform;
-						//InstanceTransform.SetLocation(Chunk->ChunkWorldPosition + (FVector(x, y, z + 1) * 50)); // Adjust location as needed
-						InstancedMeshPositions.Add((Chunk->ChunkWorldPosition + FVector(x, y, z)) * 50);
-						//HISMC->AddInstance(InstanceTransform);
+						float FoliageDensity = N->InputNoise->GetNoise(float(x) + ChunkPosition.X, float(y) + ChunkPosition.Y, float(z) + ChunkPosition.Z) + 0.4;
+						FoliageDensity = FMath::Clamp(FoliageDensity, 0, 2);
+						int FoliageN = FMath::Lerp(1, 200, FoliageDensity / 2);
+						//UE_LOG(LogTemp, Warning, TEXT("FoliageN = %d"), FoliageN);
+						if (FMath::RandRange(0, FoliageN) == 0)
+						{
+							//FTransform InstanceTransform;
+							//InstanceTransform.SetLocation(Chunk->ChunkWorldPosition + (FVector(x, y, z + 1) * 50)); // Adjust location as needed
+							InstancedMeshPositions.Add((Chunk->ChunkWorldPosition + FVector(x, y, z)) * 50 + FVector(25, 25, 0)); //add 25 to center mesh on block
+							//HISMC->AddInstance(InstanceTransform);
+						}
 					}
 				}
 			}
@@ -332,19 +321,20 @@ TArray<FCachedBlockUpdate> AProceduralTerrain::AddDecorationsWithContext(TArray<
 	{
 		GenerateTestTreeAtLocation(BlockUpdates, Chunk, 32, 32, -6);
 	}
-	AsyncTask(ENamedThreads::GameThread, [this]()
-		{
-			for (const auto& pos : InstancedMeshPositions)
-			{
-				FTransform InstanceTransform;
-				//FQuat InstanceRotation = FQuat::MakeFromEuler(FVector(0, 0, FMath::RandRange(-90, 90)));//
-				//InstanceTransform.SetRotation(InstanceRotation);
-				InstanceTransform.SetLocation(pos);
-				HISMC->AddInstance(InstanceTransform);
-			}
-			InstancedMeshPositions.Empty();
-		});
 	return BlockUpdates;
+}
+
+void AProceduralTerrain::ApplyInstancedFoliage(TArray<FVector>& Positions)
+{
+	for (const auto& pos : Positions)
+		{
+			FTransform InstanceTransform;
+			FQuat InstanceRotation = FQuat::MakeFromEuler(FVector(0, 0, 45));//
+			InstanceTransform.SetRotation(InstanceRotation);
+			InstanceTransform.SetLocation(pos);
+			HISMC->AddInstance(InstanceTransform);
+		}
+	Positions.Empty();
 }
 
 void AProceduralTerrain::MakeTestShape(TArray<FCachedBlockUpdate>& BlockUpdates, int x, int y, int z)

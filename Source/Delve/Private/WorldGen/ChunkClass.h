@@ -54,7 +54,7 @@ public:
 	~UChunkClass();
 	
 	void BeginGeneration();
-	void BeginDecoration();
+	void BeginDecorationGen();
 		
 	void Setup();
 
@@ -115,6 +115,7 @@ private:
 	FGraphEventArray TasksList;
 	FChunkMeshData* MeshData;
 	FChunkMeshData* MeshData2;
+	TArray<FVector> FoliageInstancePositions;
 	
 	bool IsChunkEmpty = true;
 
