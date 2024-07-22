@@ -262,7 +262,7 @@ void UChunkClass::AGenerateMesh()
 						DeltaAxis2[Axis2] = Height;
 
 						// Normal of Two means two sided mesh
-						if (CurrentMask.BlockData->IsTwoSided || CurrentMask.Normal == 2)
+						if (CurrentMask.BlockData->IsTwoSided && CurrentMask.Normal == 2)
 						{
 							//Prevents two sided meshes from 
 							FVector TwoSidedOffset = FVector(0.01, 0.01, 0.01) * FVector(AxisMask);

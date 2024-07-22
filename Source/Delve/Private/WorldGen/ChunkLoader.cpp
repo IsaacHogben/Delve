@@ -24,7 +24,7 @@ int ChunkLoader::LoadAllChunks(TArray<FChunkData>& chunks)
     {
         //AsyncTask(ENamedThreads::AnyBackgroundHiPriTask, [&chunks, &LineNumber, &Counter, &AllOperationsCompleteEvent]()
            // {
-                try
+                //try
                 {
                     //UE_LOG(LogTemp, Error, TEXT("Loading Chunk on line %d."), LineNumber);
                     ChunkSaveData chunkSaveData = DeserializeChunkData(TCHAR_TO_UTF8(*Line));
@@ -38,11 +38,11 @@ int ChunkLoader::LoadAllChunks(TArray<FChunkData>& chunks)
                     chunks.Add(chunkData);
                     LineNumber++;
                 }
-                catch (const LoadFailedException& e)
+                /*catch (const LoadFailedException& e)
                 {
                     UE_LOG(LogTemp, Error, TEXT("Error deserializing chunk data: %s"), *FString(e.what()));
                     return -1;
-                }
+                }*/
                 /*if (Counter.Decrement() == 0)
                 {
                     AllOperationsCompleteEvent->Trigger();
@@ -111,7 +111,7 @@ FChunkData ChunkLoader::LoadChunkAtLine(int32 LineNumber)
         throw LoadFailedException("Invalid line number.");
     }
 
-    try
+    //try
     {
         ChunkSaveData chunkSaveData = DeserializeChunkData(TCHAR_TO_UTF8(*Lines[LineNumber]));
         FChunkData chunkData;
@@ -120,11 +120,11 @@ FChunkData ChunkLoader::LoadChunkAtLine(int32 LineNumber)
         chunkData.line = LineNumber;
         return chunkData;
     }
-    catch (const LoadFailedException& e)
+    /*catch (const LoadFailedException& e)
     {
         UE_LOG(LogTemp, Error, TEXT("Error deserializing chunk data: %s"), *FString(e.what()));
         throw;
-    }
+    }*/
 }
 
 std::pair<std::unordered_map<uint8_t, uint8_t>, int> ChunkLoader::CreateBlockTypeMapping(const std::vector<uint8_t>& blockArray)
@@ -298,15 +298,15 @@ ChunkSaveData ChunkLoader::DeserializeChunkData(const std::string& line)
     std::vector<uint8_t> compressedBlocks;
     do
     {
-        try
+        //try
         {
             compressedBlocks.push_back(static_cast<uint8_t>(std::stoi(segment)));
         }
-        catch (const std::exception& e)
+        /*catch (const std::exception& e)
         {
             UE_LOG(LogTemp, Error, TEXT("Error parsing compressed block: %s"), *FString(e.what()));
             break;
-        }
+        }*/
     } while (ss >> segment);
 
     ChunkSaveData chunkData = { chunkPosition, blockTypeMap, bitsNeeded, compressedBlocks };

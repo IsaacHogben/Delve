@@ -42,7 +42,7 @@ public:
 	int WorldScale = 50;
 
 	UPROPERTY(EditAnywhere, Category = "Quality")
-	int RenderDistance = 1;
+	int WorldRadius = 1;
 
 	UPROPERTY(EditAnywhere, Category = "Generation Settings")
 	TObjectPtr<AProceduralTerrain> TerrainGenerator;

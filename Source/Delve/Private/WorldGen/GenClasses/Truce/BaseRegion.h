@@ -18,6 +18,7 @@ class UBaseRegion : public ULocalRegion
 	
 public:
     FastNoiseLite* Noise;
+    FastNoiseLite* FoliageDensityNoise;
 
     FTreeSystem Tree1;
 
@@ -26,11 +27,19 @@ public:
         Noise = new FastNoiseLite(Seed);
         Noise->SetFrequency(0.17);
         Noise->SetNoiseType(FastNoiseLite::NoiseType_Perlin);
-
         Noise->SetFractalType(FastNoiseLite::FractalType_FBm);
         Noise->SetFractalOctaves(5);
         Noise->SetFractalGain(2.75); // Size of subsequent octaves
         Noise->SetFractalLacunarity(0.5); // Density
+
+
+        FoliageDensityNoise = new FastNoiseLite(Seed);
+        FoliageDensityNoise->SetFrequency(0.02);
+        FoliageDensityNoise->SetNoiseType(FastNoiseLite::NoiseType_Perlin);
+        FoliageDensityNoise->SetFractalType(FastNoiseLite::FractalType_FBm);
+        FoliageDensityNoise->SetFractalOctaves(3);
+        FoliageDensityNoise->SetFractalGain(0.5); // Size of subsequent octaves
+        FoliageDensityNoise->SetFractalLacunarity(2); // Density
         
     };
 

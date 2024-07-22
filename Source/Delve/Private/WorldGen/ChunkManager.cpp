@@ -33,7 +33,7 @@ void AChunkManager::BeginPlay()
 	// Initialize BlockDataArray
 	BlockDataTable->GetAllRows("", BlockDataArray);
 	
-	TerrainGenerator->Initialize();
+	TerrainGenerator->Initialize(WorldRadius);
 
 	if (LoadFromFile)
 	{
@@ -87,12 +87,12 @@ void AChunkManager::UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition
 					float OutChunkDistance = FIntVectorDistance(NewPlayerChunkPosition, ChunkData->Position);
 					float InChunkDistance = FIntVectorDistance(PreviousPlayerChunkPosition, ChunkData->Position + Direction);
 
-					if (InChunkDistance > RenderDistance)
+					if (InChunkDistance > WorldRadius)
 					{
 						AvailablePositions.Add(ChunkData->Position + Direction);
 					}
 
-					if (OutChunkDistance > RenderDistance)
+					if (OutChunkDistance > WorldRadius)
 					{
 						AvailableChunks.Add(ChunkData);
 						//ChunkGenerationLayersExpected[int(ECompletedGenerationLayer::InitialTerrainLayer)]++;
@@ -174,7 +174,7 @@ void AChunkManager::UpdatePlayerChunkPositionAsync(const FVector& PlayerPosition
 void AChunkManager::GenerateChunksNew(FIntVector CentralRenderChunkVector)
 {
 	// Initialize render distance manager
-	ChunkRenderDistance crd(RenderDistance);
+	ChunkRenderDistance crd(WorldRadius);
 	// Calculate render sphere
 	//TArray<FChunkData> ChunksToSpawn = crd.CalculateRenderSphere();
 	TArray<FChunkData> ChunksToSpawn = crd.CalculateRenderDisk();

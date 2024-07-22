@@ -11,7 +11,9 @@
 
 #include "GenClasses/Truce/BaseRegion.h"
 #include "GenClasses/Truce/CliffRegion.h"
+#include "GenClasses/Truce/DomeRegion.h"
 #include "GenClasses/ProceduralParts.h"
+#include "GenClasses/GenUtils.h"
 
 #include "ProceduralTerrain.generated.h"
 
@@ -40,10 +42,12 @@ class AProceduralTerrain : public AActor
 public:
 	AProceduralTerrain();
 	~AProceduralTerrain();
-	void Initialize();
+	void Initialize(int _WorldRadius);
 	UPROPERTY()
 	UNoiseManager* N;
 
+	UPROPERTY(EditAnywhere, Category = "Generation Settings")
+	int MaxBlockSpawnHeight = 85;
 	UPROPERTY(EditAnywhere, Category = "Generation Settings")
 	TArray<FFastNoise> GenerationNoiseArray;
 
@@ -52,6 +56,8 @@ public:
 	UCurveFloat* ZDensityCurve;
 	UPROPERTY(EditAnywhere, Category = "Curves")
 	UCurveFloat* WorldEdgeDensityCurve;
+	UPROPERTY(EditAnywhere, Category = "Curves")
+	UCurveFloat* WorldEdgeDropoffCurve;
 
 	UPROPERTY(EditAnywhere, Category = "DataTables")
 	TObjectPtr<UDataTable> TreeDataTable;
@@ -63,7 +69,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Instanced")
 	UMaterialInterface* GrassMat;
 
-	FIntVector2 WorldCenter = FIntVector2(0, 0);
+	FIntVector2 WorldCenter = FIntVector2(32, 32);
 	int ChunkSize = 64;
 	int GetBlockIndex(int X, int Y, int Z);
 	
@@ -83,6 +89,8 @@ private:
 	//bool IsInLocalRegion(FastNoiseLite* Region, float RegionSize, float& x, float& y, float& z);
 	EBlock GetBlockFromRegion(ULocalRegion* LocalRegion, ESoilLayer SoilLayer);
 
+	int WorldChunkRadius;
+
 	bool IsSurfaceBlock(float AboveValue, float Density);
 	bool IsAir(float Value, float Density);
 
@@ -91,6 +99,7 @@ private:
 	void MakeTestShape(TArray<FCachedBlockUpdate>& BlockUpdates, int x, int y, int z);
 
 	void MakeTestVine(TArray<FCachedBlockUpdate>& BlockUpdates, int x, int y, int z);
+	float GetDomeHeight(const float& Radius, const float& Distance);
 	void AddCylinder(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int height, int centerX, int centerY, int baseZ, EBlock blockType);
 	void AddSphere(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int centerX, int centerY, int centerZ, EBlock blockType);
 	void AddCanopy(TArray<FCachedBlockUpdate>& BlockUpdates, int radius, int centerX, int centerY, int centerZ, EBlock blockType, uint8 density);

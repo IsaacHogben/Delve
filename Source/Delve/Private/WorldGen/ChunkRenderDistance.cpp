@@ -50,7 +50,7 @@ TArray<FChunkData> ChunkRenderDistance::CalculateRenderDisk()
 	FVector PlayerPosition = FVector(0, 0, 0);
 	TArray<FChunkData> dataArray;
 
-	for (int z = 1; z >= -7; z--)
+	for (int z = 5; z >= -7; z--) //-7 base
 	{
 		for (int x = -MaxRenderDistance; x <= MaxRenderDistance; x++)
 		{

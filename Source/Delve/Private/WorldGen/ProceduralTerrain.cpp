@@ -15,7 +15,7 @@ AProceduralTerrain::~AProceduralTerrain()
 }
 
 // Called when the game starts or when spawned
-void AProceduralTerrain::Initialize()
+void AProceduralTerrain::Initialize(int _WorldRadius)
 {
 	UE_LOG(LogTemp, Warning, TEXT("BeginPlay called in ProceduralTerrain"));
 	N = NewObject<UNoiseManager>();
@@ -23,11 +23,13 @@ void AProceduralTerrain::Initialize()
 	// Initialize regions
 	BaseRegion = NewObject<UBaseRegion>();
 	CliffRegion = NewObject<UCliffRegion>();
+
 	// Load TreeData into memory
 	TreeDataTable->GetAllRows("", TreeDataArray);
 
 	HISMC->SetStaticMesh(IMGrass);
 	HISMC->SetMaterial(0, GrassMat);
+	WorldChunkRadius = _WorldRadius;
 }
 
 int QuantizeCoordinate(int value, int quantizationStep)
@@ -85,6 +87,10 @@ EBlock AProceduralTerrain::GetTerrainLevelOne(float x, float y, float z, EBlock 
 	float UpZ = z + 1;
 	const int CliffZMod = 2;
 
+	//dome
+	int WorldRadius = WorldChunkRadius * 64 - 122;
+	float DistanceFromCenter = FMath::Sqrt(FMath::Square(x - WorldCenter.X) + FMath::Square(y - WorldCenter.Y));
+
 	// Alter value based on Cliff Region
 	if (CliffRegion->IsInRegion(x, y, z, Value, UpValue))
 	{
@@ -100,52 +106,24 @@ EBlock AProceduralTerrain::GetTerrainLevelOne(float x, float y, float z, EBlock 
 		UpValue = BaseRegion->Noise->GetNoise(x, y, (UpZ - CliffZMod) * ZSquish);
 	}
 
-	//Alter Density for World Edge 786 = 15 chunks
-	int WorldRadius = 300;
-	float Distance = FMath::Sqrt(FMath::Square(x - WorldCenter.X) + FMath::Square(y - WorldCenter.Y));
-	if (Distance >= WorldRadius)
-	{
-		float WorldEdgeDropoff = WorldEdgeDensityCurve->GetFloatValue(Distance - WorldRadius);
-		Density += WorldEdgeDropoff;
-		UpDensity += WorldEdgeDropoff;
-		if (Density >= 1)
-			return EBlock::CliffStone;
-	}
-	else
-	{
-		//Alter Density for World Surface
-		int MaxWorldheight = 25;
-		int Offset = MaxWorldheight / 2;
-		float WorldHeight = N->WorldHeightNoise->GetNoise(x, y);
-
-		WorldHeight = WorldHeight * MaxWorldheight;
-		if (z > WorldHeight + Offset && Value < 0)
-		{
-			Density = -1;
-		}
-		if (z + 1 > WorldHeight + Offset && Value < 0)
-		{
-			UpDensity = -1;
-		}
-	}
-
 	// Pillar calculations to move or delete vvvv
-	/*if (z >= 0)
+	if (z >= 0)
 	{	
-		const int TransitionHeight = 6;
+		const int TransitionHeight = 16;
 		const int MaxPillarHeight = 32;
 		const int MinPillarHeight = 0;
-		const float PillarDensity = 0.999;
-		const float WorldCellHeight = FMath::Clamp(FMath::RoundToInt(N->WorldHeightCellNoise->GetNoise(x, y) * 100), TransitionHeight + MinPillarHeight, MaxPillarHeight);
+		const float PillarDensity = 0.5;
+		const float WorldCellHeight = 300;//FMath::Clamp(FMath::RoundToInt(N->WorldHeightCellNoise->GetNoise(x, y) * 100), TransitionHeight + MinPillarHeight, MaxPillarHeight);
+		float WorldHieghtCellDensity = N->InputNoise->GetNoise(x, y);
 
-		float WorldHieghtCellDensity = N->WorldHeightCellDensityNoise->GetNoise(x, y) * -1;// Invert
+		//float WorldHieghtCellDensity = N->WorldHeightCellDensityNoise->GetNoise(x, y) * -1;// Invert
 		WorldHieghtCellDensity -= PillarDensity;
 
 		if (z < TransitionHeight)
 		{
 			if (z != 0)
-				Density = FMath::Lerp(0, WorldHieghtCellDensity, z / TransitionHeight);
-			UpDensity = FMath::Lerp(0, WorldHieghtCellDensity, (z + 1) / TransitionHeight);
+				Density = FMath::Lerp(Density, WorldHieghtCellDensity, z / TransitionHeight);
+			UpDensity = FMath::Lerp(UpDensity, WorldHieghtCellDensity, (z + 1) / TransitionHeight);
 		}
 		else if (z < WorldCellHeight)
 		{
@@ -153,15 +131,67 @@ EBlock AProceduralTerrain::GetTerrainLevelOne(float x, float y, float z, EBlock 
 				Density = WorldHieghtCellDensity;
 			UpDensity = WorldHieghtCellDensity;
 		}
-		else if (z >= WorldCellHeight)
+		else if (z >= WorldCellHeight && 0)
 		{
 			//if (z != WorldCellHeight)
-				Density = FMath::Lerp(WorldHieghtCellDensity, -2, (z - WorldCellHeight) / TransitionHeight);
-			UpDensity = FMath::Lerp(WorldHieghtCellDensity, -2, (z + 1 - WorldCellHeight) / TransitionHeight);
+				Density = FMath::Lerp(Density, -2, (z - WorldCellHeight) / TransitionHeight);
+			UpDensity = FMath::Lerp(UpDensity, -2, (z + 1 - WorldCellHeight) / TransitionHeight);
 		}
-	}*/
-	
+	}
 
+	//Alter Density for World Surface
+	if (z > MaxBlockSpawnHeight)
+	{	
+		int MaxHeight = 20;
+		float WorldHeight = N->WorldHeightNoise->GetNoise(x, y);
+
+		WorldHeight = WorldHeight * MaxHeight + MaxHeight;
+		if (z > MaxBlockSpawnHeight + WorldHeight)
+		{
+			Density = -2;
+		}
+		if (z + 1 > MaxBlockSpawnHeight + WorldHeight)
+		{
+			UpDensity = -2;
+		}
+	}
+
+	//Alter Density for World Edge 786 = 15 chunks
+	if (DistanceFromCenter >= WorldRadius)
+	{
+		float WorldEdgeDensity = WorldEdgeDensityCurve->GetFloatValue(DistanceFromCenter - WorldRadius);
+		float WorldEdgeDropoffDensity = WorldEdgeDropoffCurve->GetFloatValue(DistanceFromCenter - WorldRadius);
+
+		if (z < 0)
+			Density += WorldEdgeDensity;
+		if (z + 1 < 0)
+			UpDensity += WorldEdgeDensity;
+
+		int DropOffStart = 50;
+		int DropOffEnd = 52;
+
+		if (z < 0 && z > -18)
+		{
+			DropOffStart += -z -18;
+			DropOffEnd += -z -18;
+		}
+
+		if (z >= 0)
+		{
+			DropOffStart += -18;
+			DropOffEnd += -18;
+		}
+
+		if (DistanceFromCenter >= WorldRadius + DropOffStart)
+		{
+			float Alpha = GenUtils::normalizeValue(DistanceFromCenter, (WorldRadius + DropOffStart), (WorldRadius + DropOffStart + DropOffEnd));
+			/*(DistanceFromCenter - (WorldRadius + DropOffStart)) / ((WorldRadius + DropOffStart + DropOffEnd) - (WorldRadius + DropOffStart));*/
+			Density = FMath::Lerp(Density, -2, Alpha);
+			UpDensity = FMath::Lerp(UpDensity, -2, Alpha);
+		}
+	}
+
+	//GetBlock
 	if (IsAir(Value, Density))
 		return EBlock::Air;
 	if (LocalRegion == CliffRegion)
@@ -198,7 +228,7 @@ TArray<FCachedBlockUpdate> AProceduralTerrain::GetGeneratedChunk(FVector ChunkPo
 			{				
 				if (0)// TEST NOISE - Used to test new noise values on their own
 				{
-					float noise = N->InputNoise->GetNoise(float(x) + ChunkPosition.X, float(y) + ChunkPosition.Y, float(z) + ChunkPosition.Z);
+					float noise = BaseRegion->FoliageDensityNoise->GetNoise(float(x) + ChunkPosition.X, float(y) + ChunkPosition.Y, float(z) + ChunkPosition.Z);
 					if (noise > ZDensityCurve->GetFloatValue(z + ChunkPosition.Z))
 						BlockArray[GetBlockIndex(x, y, z)] = EBlock::Air;
 					else
@@ -301,7 +331,7 @@ TArray<FCachedBlockUpdate> AProceduralTerrain::AddDecorationsWithContext(TArray<
 					}
 					if (Block == EBlock::Grass)
 					{
-						float FoliageDensity = N->InputNoise->GetNoise(float(x) + ChunkPosition.X, float(y) + ChunkPosition.Y, float(z) + ChunkPosition.Z) + 0.4;
+						float FoliageDensity = BaseRegion->FoliageDensityNoise->GetNoise(float(x) + ChunkPosition.X, float(y) + ChunkPosition.Y, float(z) + ChunkPosition.Z) - 0;
 						FoliageDensity = FMath::Clamp(FoliageDensity, 0, 2);
 						int FoliageN = FMath::Lerp(1, 200, FoliageDensity / 2);
 						//UE_LOG(LogTemp, Warning, TEXT("FoliageN = %d"), FoliageN);
@@ -577,6 +607,19 @@ void AProceduralTerrain::GenerateTree(TArray<FCachedBlockUpdate>& BlockUpdates, 
 			break;
 		}
 	}
+}
+
+float AProceduralTerrain::GetDomeHeight(const float& Radius, const float& Distance)
+{
+	// Check if the distance is within the dome's radius
+	if (Distance > Radius) {
+		//UE_LOG(LogTemp, Error, TEXT("DistanceFromCenter from the center cannot be greater than the radius of the dome"));
+		return 0; // Return an error value
+	}
+
+	// Calculate the height using the formula z = sqrt(R^2 - r^2)
+	double z = std::sqrt(Radius * Radius - Distance * Distance);
+	return z;
 }
 
 void AProceduralTerrain::GenerateTestTreeAtLocation(TArray<FCachedBlockUpdate>& BlockUpdates, UChunkClass* Chunk, int x, int y, int z) {
