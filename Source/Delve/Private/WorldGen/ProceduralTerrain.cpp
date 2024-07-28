@@ -20,9 +20,11 @@ void AProceduralTerrain::Initialize(int _WorldRadius)
 	UE_LOG(LogTemp, Warning, TEXT("BeginPlay called in ProceduralTerrain"));
 	N = NewObject<UNoiseManager>();
 	N->InitializeArray(GenerationNoiseArray);
+
 	// Initialize regions
 	BaseRegion = NewObject<UBaseRegion>();
 	CliffRegion = NewObject<UCliffRegion>();
+	TopRegion = NewObject<UTopRegion>();
 
 	// Load TreeData into memory
 	TreeDataTable->GetAllRows("", TreeDataArray);
@@ -78,14 +80,16 @@ EBlock AProceduralTerrain::GetBlockFromRegion(ULocalRegion* LocalRegion, ESoilLa
 EBlock AProceduralTerrain::GetTerrainLevelOne(float x, float y, float z, EBlock AboveBlock)
 {
 	ESoilLayer SoilLayer = ESoilLayer::Bedrock;
-	ULocalRegion* LocalRegion = BaseRegion;
+	ULocalRegion* Region = BaseRegion;
+	if (TopRegion->IsInRegion(x, y, z))
+		Region = TopRegion;
 	float ZSquish = 1.2;
 	float Density = ZDensityCurve->GetFloatValue(z);
 	float UpDensity = ZDensityCurve->GetFloatValue(z + 1);
 	auto Value = BaseRegion->Noise->GetNoise(x, y, z * ZSquish);
 	auto UpValue = BaseRegion->Noise->GetNoise(x, y, (z+1) * ZSquish);
 	float UpZ = z + 1;
-	const int CliffZMod = 2;
+	const int CliffZMod = 0; //shifts cliff regions up or down by amount
 
 	//dome
 	int WorldRadius = WorldChunkRadius * 64 - 122;
@@ -95,64 +99,67 @@ EBlock AProceduralTerrain::GetTerrainLevelOne(float x, float y, float z, EBlock 
 	if (CliffRegion->IsInRegion(x, y, z, Value, UpValue))
 	{
 		z = QuantizeCoordinate(z, 6);
-		LocalRegion = CliffRegion;
+		Region = CliffRegion;
 		Value = BaseRegion->Noise->GetNoise(x, y, (z - CliffZMod) * ZSquish);
 		//UpValue = N->BaseNoise->GetNoise(x, y, (z + 1) * ZSquish);
 	}	
 	if (CliffRegion->IsInRegion(x, y, UpZ, Value, UpValue))
 	{
 		UpZ = QuantizeCoordinate(z, 6);
-		LocalRegion = CliffRegion;
+		Region = CliffRegion;
 		UpValue = BaseRegion->Noise->GetNoise(x, y, (UpZ - CliffZMod) * ZSquish);
 	}
 
-	// Pillar calculations to move or delete vvvv
-	if (z >= 0)
-	{	
-		const int TransitionHeight = 16;
-		const int MaxPillarHeight = 32;
-		const int MinPillarHeight = 0;
-		const float PillarDensity = 0.5;
-		const float WorldCellHeight = 300;//FMath::Clamp(FMath::RoundToInt(N->WorldHeightCellNoise->GetNoise(x, y) * 100), TransitionHeight + MinPillarHeight, MaxPillarHeight);
-		float WorldHieghtCellDensity = N->InputNoise->GetNoise(x, y);
+	if (0)
+	{
+		// Pillar calculations to move or delete vvvv
+		if (z >= 0)
+		{
+			const int TransitionHeight = 16;
+			const int MaxPillarHeight = 32;
+			const int MinPillarHeight = 0;
+			const float PillarDensity = 0.7;
+			const float WorldCellHeight = 100;//FMath::Clamp(FMath::RoundToInt(N->WorldHeightCellNoise->GetNoise(x, y) * 100), TransitionHeight + MinPillarHeight, MaxPillarHeight);
+			float WorldHieghtCellDensity = N->InputNoise->GetNoise(x, y);
 
-		//float WorldHieghtCellDensity = N->WorldHeightCellDensityNoise->GetNoise(x, y) * -1;// Invert
-		WorldHieghtCellDensity -= PillarDensity;
+			//float WorldHieghtCellDensity = N->WorldHeightCellDensityNoise->GetNoise(x, y) * -1;// Invert
+			WorldHieghtCellDensity -= PillarDensity;
 
-		if (z < TransitionHeight)
-		{
-			if (z != 0)
-				Density = FMath::Lerp(Density, WorldHieghtCellDensity, z / TransitionHeight);
-			UpDensity = FMath::Lerp(UpDensity, WorldHieghtCellDensity, (z + 1) / TransitionHeight);
-		}
-		else if (z < WorldCellHeight)
-		{
-			if (z != 0)
-				Density = WorldHieghtCellDensity;
-			UpDensity = WorldHieghtCellDensity;
-		}
-		else if (z >= WorldCellHeight && 0)
-		{
-			//if (z != WorldCellHeight)
+			if (z < TransitionHeight)
+			{
+				if (z != 0)
+					Density = FMath::Lerp(Density, WorldHieghtCellDensity, z / TransitionHeight);
+				UpDensity = FMath::Lerp(UpDensity, WorldHieghtCellDensity, (z + 1) / TransitionHeight);
+			}
+			else if (z < WorldCellHeight)
+			{
+				if (z != 0)
+					Density = WorldHieghtCellDensity;
+				UpDensity = WorldHieghtCellDensity;
+			}
+			else if (z >= WorldCellHeight && 0)
+			{
+				//if (z != WorldCellHeight)
 				Density = FMath::Lerp(Density, -2, (z - WorldCellHeight) / TransitionHeight);
-			UpDensity = FMath::Lerp(UpDensity, -2, (z + 1 - WorldCellHeight) / TransitionHeight);
+				UpDensity = FMath::Lerp(UpDensity, -2, (z + 1 - WorldCellHeight) / TransitionHeight);
+			}
 		}
-	}
 
-	//Alter Density for World Surface
-	if (z > MaxBlockSpawnHeight)
-	{	
-		int MaxHeight = 20;
-		float WorldHeight = N->WorldHeightNoise->GetNoise(x, y);
+		//Alter Density for World Surface
+		if (z > MaxBlockSpawnHeight)
+		{
+			int MaxHeight = 20;
+			float WorldHeight = N->WorldHeightNoise->GetNoise(x, y);
 
-		WorldHeight = WorldHeight * MaxHeight + MaxHeight;
-		if (z > MaxBlockSpawnHeight + WorldHeight)
-		{
-			Density = -2;
-		}
-		if (z + 1 > MaxBlockSpawnHeight + WorldHeight)
-		{
-			UpDensity = -2;
+			WorldHeight = WorldHeight * MaxHeight + MaxHeight;
+			if (z > MaxBlockSpawnHeight + WorldHeight)
+			{
+				Density = -2;
+			}
+			if (z + 1 > MaxBlockSpawnHeight + WorldHeight)
+			{
+				UpDensity = -2;
+			}
 		}
 	}
 
@@ -194,7 +201,7 @@ EBlock AProceduralTerrain::GetTerrainLevelOne(float x, float y, float z, EBlock 
 	//GetBlock
 	if (IsAir(Value, Density))
 		return EBlock::Air;
-	if (LocalRegion == CliffRegion)
+	if (Region == CliffRegion)
 	{
 		if (AboveBlock == EBlock::Air)
 			return GetBlockFromRegion(CliffRegion, ESoilLayer::Topsoil);
@@ -209,7 +216,7 @@ EBlock AProceduralTerrain::GetTerrainLevelOne(float x, float y, float z, EBlock 
 			SoilLayer = ESoilLayer::Subsoil;
 	}
 
-	return GetBlockFromRegion(LocalRegion, SoilLayer);
+	return GetBlockFromRegion(Region, SoilLayer);
 }
 
 //Generates first layer terrain and returns FBulkBlockUpdate for additional levels of modification.

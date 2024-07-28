@@ -266,7 +266,8 @@ UProceduralMeshComponent* AChunkManager::CreateMeshSection(FChunkMeshData* MeshD
 		{
 			Mesh->SetMaterial(0, TerrainMaterial);
 			Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-			EnqueueMeshUpdate(Mesh, *MeshData, Transform, Lod, Vertexes);
+			//EnqueueMeshUpdate(Mesh, *MeshData, Transform, Lod, Vertexes);
+			UpdateMeshSection(Mesh, *MeshData, Transform, Lod, Vertexes);
 		}
 		else
 		{

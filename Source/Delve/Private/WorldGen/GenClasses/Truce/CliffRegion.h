@@ -50,7 +50,7 @@ public:
     bool IsInRegion(float& x, float& y, float& z, float & Value, float & UpValue) const
     {
         // Specific implementation for Cliff region
-        if ((z > RegionEnd && z < RegionStart) || (z > 12 && z < 200))
+        if (z > RegionEnd && z < RegionStart)
         {
             //Attempt to exclude parts from being in Cliif Region based on their slope
             float slope = UpValue - Value;

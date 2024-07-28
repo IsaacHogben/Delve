@@ -11,7 +11,7 @@
 
 #include "GenClasses/Truce/BaseRegion.h"
 #include "GenClasses/Truce/CliffRegion.h"
-#include "GenClasses/Truce/DomeRegion.h"
+#include "GenClasses/Truce/TopRegion.h"
 #include "GenClasses/ProceduralParts.h"
 #include "GenClasses/GenUtils.h"
 

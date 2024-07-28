@@ -4,7 +4,7 @@
 UENUM(BlueprintType)
 enum class EBlock : uint8
 {
-	Null, Air, Stone, Dirt, Grass, Leaves, CliffStone, Moss, Log, Vine, Ruin
+	Null, Air, Stone, Dirt, Grass, Leaves, CliffStone, Moss, Log, Vine, Ruin, CrackedDirt
 };
 
 UENUM(BlueprintType)

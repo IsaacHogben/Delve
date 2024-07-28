@@ -18,7 +18,8 @@ class ULocalRegion : public UObject
 	GENERATED_BODY()
 
 public:
-	int Seed = 3353533;
+	int Seed = 333533;
+	int SurfaceStartHeight = -7;
 	EBlock Topsoil;
 	EBlock Subsoil;
 	EBlock Bedrock;
