@@ -15,8 +15,10 @@ void UNoiseManager::InitializeArray(TArray<FFastNoise> NoiseArray)
 	{
 		InputNoise = InitializeNoise(NoiseArray[0]);
 		WorldHeightNoise = InitializeNoise(NoiseArray[1]);
-		//WorldHeightCellDensityNoise = InitializeNoise(NoiseArray[1]);
-		//WorldHeightCellDensityNoise->SetCellularReturnType(FastNoiseLite::CellularReturnType_Distance);
+		WorldHeightCellDensityNoise = InitializeNoise(NoiseArray[0]);
+		WorldHeightCellDensityNoise->SetCellularReturnType(FastNoiseLite::CellularReturnType_CellValue);
+		InputNoise->SetDomainWarpType(FastNoiseLite::DomainWarpType_OpenSimplex2);
+		InputNoise->SetDomainWarpAmp(200);
 	}
 }
 

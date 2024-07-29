@@ -125,4 +125,5 @@ public:
 	// Noise for level 1
 	FastNoiseLite* InputNoise;
 	FastNoiseLite* WorldHeightNoise;
+	FastNoiseLite* WorldHeightCellDensityNoise;
 };

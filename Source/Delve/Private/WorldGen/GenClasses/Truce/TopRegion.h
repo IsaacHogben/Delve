@@ -22,9 +22,9 @@ public:
 
     UTopRegion()
     {
-        Topsoil = EBlock::CrackedDirt;
-        Subsoil = EBlock::CrackedDirt;
-        Bedrock = EBlock::Ruin;
+        Topsoil = EBlock::SurfaceGrass;
+        Subsoil = EBlock::WhiteStone;
+        Bedrock = EBlock::WhiteStone;
 
         Noise = new FastNoiseLite(Seed);
         Noise->SetFrequency(0.008);
@@ -48,7 +48,7 @@ public:
         // Specific implementation for TopRegion
         return EBlock::Null;
     }
-    virtual bool IsInRegion(float& x, float& y, float& z) const
+    virtual bool IsInRegion(float& x, float& y, float z) const
     {
         if (z > SurfaceStartHeight)
             return true;

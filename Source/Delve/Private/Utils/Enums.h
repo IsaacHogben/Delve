@@ -4,7 +4,7 @@
 UENUM(BlueprintType)
 enum class EBlock : uint8
 {
-	Null, Air, Stone, Dirt, Grass, Leaves, CliffStone, Moss, Log, Vine, Ruin, CrackedDirt
+	Null, Air, Stone, Dirt, Grass, Leaves, CliffStone, Moss, Log, Vine, Ruin, SurfaceGrass, WhiteStone
 };
 
 UENUM(BlueprintType)
@@ -22,7 +22,7 @@ enum class ELocalRegion : uint8
 UENUM(BlueprintType)
 enum class ESoilLayer : uint8
 {
-	Topsoil, Subsoil, Bedrock
+	Topsoil, Subsoil, Bedrock, SubsoilOverride, Override
 };
 
 UENUM(BlueprintType)
